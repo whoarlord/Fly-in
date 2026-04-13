@@ -6,7 +6,7 @@ class Zone(Enum):
     normal = "normal"
     blocked = "blocked"
     restricted = "restricted"
-    prioriy = "priority"
+    priority = "priority"
 
 
 class Connection:
@@ -16,18 +16,38 @@ class Connection:
         self.edge_2: Hub = edge_2
         self.max_link_capacity: int = max_link_capacity
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (f"{self.edge_1.name}-{self.edge_2.name}, "
                 f"max link: {self.max_link_capacity}")
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def other_hub(self, actual_hub: "Hub"):
+        if self.edge_1 == actual_hub:
+            return self.edge_2
+        else:
+            return self.edge_1
 
 
 class Hub:
     class Drone:
         def __init__(self, id: int):
             self.__id = id
+            self.route: list[tuple] = []
 
         def get_id(self) -> int:
             return self.__id
+
+        def __str__(self) -> str:
+            result = f"id: {self.__id}, route: ["
+            for hub in self.route:
+                result += f"[{hub[0].name}, {hub[1]}]"
+            result += "]"
+            return result
+
+        def __repr__(self) -> str:
+            return f"- {self.__str__}"
 
     def __init__(self, name: str, x: int, y: int, type_of_hub: int = 0,
                  zone: Zone = Zone.normal, color: Any = None,
@@ -38,6 +58,8 @@ class Hub:
         self.type_of_hub: int = type_of_hub
         self.zone: Zone = zone
         self.color: Any = color
+        if color == "rainbow":
+            self.color = "pink"
         self.max_drones: int = max_drones
         self.drones: list[Hub.Drone] = []
         self.connections: list[Connection] = []
@@ -54,7 +76,30 @@ class Hub:
                 return True
         return False
 
-    def create_drones(self, nb_drones: int):
+    def calculate_hub_cost(self) -> int:
+        if self.zone.name == "normal":
+            return 1
+        elif self.zone.name == "blocked":
+            return -1
+        elif self.zone.name == "restricted":
+            return 2
+        elif self.zone.name == "priority":
+            return 1
+
+    def calculate_route(self, drone: "Hub.Drone", heuristic: dict[str, int]):
+        cost: int = 100000
+        actual_hub: Hub = self
+        next_hub: Hub = self
+        while (heuristic.get(actual_hub.name, 1) != 0):
+            for connection in actual_hub.connections:
+                temp_hub = connection.other_hub(actual_hub)
+                if heuristic.get(temp_hub.name, 0) < cost:
+                    cost = heuristic.get(temp_hub.name, 0)
+                    next_hub = temp_hub
+            actual_hub = next_hub
+            drone.route.append(tuple([actual_hub, cost]))
+
+    def create_drones(self, nb_drones: int) -> None:
         if self.type_of_hub != 1:
             print("Only the start_hub can create drones")
         else:
