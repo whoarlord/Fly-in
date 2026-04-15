@@ -18,7 +18,6 @@ class Map:
         return cls.__map
 
     def get_hub(self, hub_str: str) -> Hub:
-        print(hub_str)
         for hub in self.hubs:
             if hub.name == hub_str:
                 return hub
@@ -71,8 +70,10 @@ class Map:
         end: int = 0
         for hub in self.hubs:
             if hub.type_of_hub == 1:
+                hub.max_drones = self.nb_drones
                 start += 1
             elif hub.type_of_hub == 2:
+                hub.max_drones = self.nb_drones
                 end += 1
         if start == 0:
             raise ValueError("No start hub where gave")
@@ -112,11 +113,11 @@ class Map:
                 key = position, t
                 ids: list = []
                 times: int = 1
+                conflicting_hub: Hub = self.get_hub(position)
                 if key in ocuppied:
                     value = ocuppied[key]
                     ids.extend(value[0])
                     times = value[1]
-                    conflicting_hub: Hub = self.get_hub(position)
                     times += 1
                     if times > conflicting_hub.max_drones:
                         return {
@@ -124,6 +125,25 @@ class Map:
                             "t": t,
                             "drones": [ocuppied[key][0][-1], id]
                         }
+                    if conflicting_hub.zone == "restricted":
+                        key_restricted = position, t - 1
+                        ids_restricted: list = []
+                        times_restricted: int = 1
+                        if key in ocuppied:
+                            value = ocuppied[key]
+                            ids_restricted.extend(value[0])
+                            times_restricted = value[1]
+                            times_restricted += 1
+                            if times_restricted > conflicting_hub.max_drones:
+                                return {
+                                    "v": position,
+                                    "t": t,
+                                    "drones":
+                                        [ocuppied[key_restricted][0][-1], id]
+                                }
+                        ocuppied.update(
+                            {key_restricted: [ids_restricted,
+                                              times_restricted]})
                 ids.append(id)
                 ocuppied.update({key: [ids, times]})
         for id, path in self.constraint_tree.solutions:
@@ -184,12 +204,16 @@ class Map:
 
         self.initialize_heuristic_and_routes()
         conflict: Any = {}
-        while (conflict is not None):
+        count: int = 0
+        while (conflict is not None and count < 2000):
+            # print(self.constraint_tree)
             conflict = self.check_conflicts()
             if conflict is None:
                 break
             self.constraint_tree.create_new_tree(conflict, self)
-        print(self.constraint_tree)
+            count += 1
+        print(count)
+        print(self.constraint_tree.solutions)
         g: Graphics = Graphics()
         g.initialize_graphics(self)
 

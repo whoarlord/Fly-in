@@ -10,6 +10,13 @@ class Zone(Enum):
 
 
 class Connection:
+    """Class for making connections between Hubs
+
+    Args:
+    - edge_1: first hub of the connection
+    - edge_2: second hub of the connection
+    - max_link_capacity: maximun quantity of drones that can be on a connection
+    """
     wait_connection: Any = None
 
     def __init__(self, edge_1: "Hub", edge_2: "Hub",
@@ -26,6 +33,7 @@ class Connection:
         return f"[{self.__str__()}]"
 
     def other_hub(self, actual_hub: "Hub"):
+        """function that takes a hub and return the other hub of the link"""
         if self.edge_1 == actual_hub:
             return self.edge_2
         else:
@@ -33,6 +41,7 @@ class Connection:
 
     @classmethod
     def wait(cls) -> Any:
+        """Function for returning the unique wait connection for waiting"""
         if cls.wait_connection is None:
             cls.wait_connection = Connection(Hub.wait(), Hub.wait(), 100000000)
         return cls.wait_connection
@@ -40,6 +49,7 @@ class Connection:
     def check_connection_constraint(
             self, drone: "Hub.Drone", g: int,
             constraints: list[tuple]) -> bool:
+        """Function for checking a connection based on the constraints"""
         for constraint in constraints:
             if isinstance(constraint[1], Connection):
                 if (constraint[0] == drone
@@ -49,9 +59,26 @@ class Connection:
 
 
 class Hub:
+    """A class representing a hub
+
+    Args:
+    - name: the unique name of the hub
+    - x: horizontal coordinate
+    - y: vertical coordinate
+    - type_of_hub: a integer representing the type of hub between 3 hubs:
+        - type_of_hub = 0: normal hub
+        - type_of_hub = 1: start hub
+        - type_of_hub = 2: end hub
+    """
     wait_Hub: Any = None
 
     class Drone:
+        """A class representing each drone by an id
+
+        Args:
+        - id: an integer representing an identifier of the drone
+        """
+
         def __init__(self, id: int):
             self.__id = id
 
@@ -143,16 +170,18 @@ class Hub:
     def calculate_route(
             self, drone: "Hub.Drone", heuristic: dict[str, int],
             constraints: list[tuple]) -> list[tuple]:
-        t: int = 100000
         g: int = 1
         actual_hub: Hub = self
         route: list[tuple] = []
-        next_connection: Connection = Connection.wait()
-        next_hub: Hub = self
         while (actual_hub.type_of_hub != 2):
+            next_is_priority: bool = False
+            t = heuristic.get(actual_hub.name, 0) + g
+            next_connection = Connection.wait()
+            next_hub: Hub = actual_hub
+
             for connection in actual_hub.connections:
                 temp_hub = connection.other_hub(actual_hub)
-                if heuristic.get(temp_hub.name, 0) + g <= t:
+                if heuristic.get(temp_hub.name, 0) + g < t:
                     if (temp_hub.check_hub_contraint(drone, g, constraints)
                             or connection.check_connection_constraint(
                                 drone, g, constraints)):
@@ -160,11 +189,23 @@ class Hub:
                     t = heuristic.get(temp_hub.name, 0) + g
                     next_connection = connection
                     next_hub = temp_hub
+                elif heuristic.get(temp_hub.name, 0) + g == t:
+                    if (temp_hub.check_hub_contraint(drone, g, constraints)
+                            or connection.check_connection_constraint(
+                                drone, g, constraints)):
+                        continue
+                    if (temp_hub.zone == Zone.priority
+                            and not next_is_priority):
+                        t = heuristic.get(temp_hub.name, 0) + g
+                        next_connection = connection
+                        next_hub = temp_hub
+                        next_is_priority = True
+
             if next_hub is actual_hub:
                 next_connection = Connection.wait()
             actual_hub = next_hub
             route.append(tuple([actual_hub.name, g, next_connection]))
-            g += 1
+            g += actual_hub.calculate_hub_cost()
         return route
 
     def create_drones(self, nb_drones: int) -> None:

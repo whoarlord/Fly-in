@@ -86,12 +86,13 @@ class Parser:
                     else:
                         raise ValueError(
                             "Invalid metadata key")
-        drone_map.add_hub(Hub(arguments[0], int(arguments[1]), int(
-            arguments[2]), type_of_hub, zone, color, max_drones))
+
         if type_of_hub == 1:
             self.start = 1
         elif type_of_hub == 2:
             self.end = 1
+        drone_map.add_hub(Hub(arguments[0], int(arguments[1]), int(
+            arguments[2]), type_of_hub, zone, color, max_drones))
 
     def initialize(self, drone_map: Map, file_name: str) -> None:
         i: int = 1

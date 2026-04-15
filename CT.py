@@ -44,7 +44,6 @@ class CT:
                                         conflict.get("t")]))
         left_solutions = drone_map.update_solutions(left_constraints)
         right_solutions = drone_map.update_solutions(right_constraints)
-        print(left_solutions)
         left_cost = self.calculate_cost(left_solutions)
         right_cost = self.calculate_cost(right_solutions)
         if left_cost < right_cost:

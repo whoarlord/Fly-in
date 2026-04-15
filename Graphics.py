@@ -27,20 +27,21 @@ class Graphics:
         return tuple([height + radius + 15, width + radius + 15])
 
     @staticmethod
-    def move_drone(canvas: Canvas, drone_id: int, cx: int, cy: int):
-        canvas.coords(drone_id, cx, cy)
+    def move(canvas: Canvas, id: int, cx: int, cy: int):
+        canvas.coords(id, cx, cy)
 
     def animate(
             self, root: Tk, canvas: Canvas, drone_map: Map, turn: int,
-            turn_id: int, drone_ids: list[int],
-            scale: int = 220, margin: int = 100):
+            turn_id: int, drone_ids: list[int], drone_text_ids: list[int],
+            scale: int = 220, margin: int = 100, id_location=58):
         ct = drone_map.constraint_tree
         solutions: list[tuple] = ct.solutions
         if turn == ct.cost:
             return
-
         for drone, paths in solutions:
             if len(paths) == 0:
+                continue
+            if paths[0][1] - 1 != turn:
                 continue
             path = paths.pop(0)
             dest_hub = drone_map.get_hub(path[0])
@@ -53,12 +54,15 @@ class Graphics:
                 canvas.itemconfig(actual_id, text=len(actual_hub.drones))
             cx = dest_hub.x * scale + margin
             cy = dest_hub.y * scale + margin
-            self.move_drone(canvas, drone_ids[drone.get_id()], cx, cy)
+            self.move(canvas, drone_ids[drone.get_id()], cx, cy)
+            self.move(
+                canvas, drone_text_ids[drone.get_id()],
+                cx, cy + id_location)
 
         turn += 1
         canvas.itemconfig(turn_id, text=f"Turn: {turn}")
         root.after(1000, self.animate, root, canvas, drone_map,
-                   turn, turn_id, drone_ids, scale, margin)
+                   turn, turn_id, drone_ids, drone_text_ids)
 
     def initialize_graphics(
             self, drone_map: Map, height=700, width=700, scale=220,
@@ -93,6 +97,7 @@ class Graphics:
                     tx, ty, text=f"capacity: {connection.max_link_capacity} ",
                     fill="#003087", font=("Arial", 8)))
         drones: list[int] = []
+        drones_text: list[int] = []
         img = PhotoImage(file="drone.png")
         for i in range(drone_map.nb_drones):
             drone = C.create_image(
@@ -100,8 +105,15 @@ class Graphics:
                 drone_map.start_hub.y * scale + margin, image=img)
             C.tag_lower(drone)
             drones.append(drone)
+            drone_text = C.create_text(
+                drone_map.start_hub.x * scale + margin,
+                drone_map.start_hub.y * scale + margin + radius + 8,
+                text=f"id: {i} ", font=("Arial", 8))
+            C.tag_raise(drone_text)
+            print(drone_text)
+            drones_text.append(drone_text)
         turn_id: int = C.create_text(width/2, 15, text="Turn: 0")
         C.pack()
         root.after(500, self.animate, root, C,
-                   drone_map, 0, turn_id, drones, scale, margin)
+                   drone_map, 0, turn_id, drones, drones_text, scale, margin)
         mainloop()
