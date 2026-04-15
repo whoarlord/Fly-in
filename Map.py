@@ -1,12 +1,15 @@
 from typing import Any
 from Hub import Hub, Connection
+from CT import CT, Conflict_types
 
 
 class Map:
     __map: Any = None
-    __nb_drones: int
+    nb_drones: int
+    start_hub: Hub
+    end_hub: Hub
     heuristic: dict[str, int] = {}
-
+    constraint_tree: CT = CT([], [])
     hubs: set[Hub] = set()
 
     def __new__(cls) -> Any:
@@ -14,8 +17,15 @@ class Map:
             cls.__map = object.__new__(cls)
         return cls.__map
 
+    def get_hub(self, hub_str: str) -> Hub:
+        print(hub_str)
+        for hub in self.hubs:
+            if hub.name == hub_str:
+                return hub
+        return None
+
     def update_drones(self, nb_drones: int) -> None:
-        self.__nb_drones = nb_drones
+        self.nb_drones = nb_drones
 
     def add_hub(self, new_hub: Hub) -> None:
         for hub in self.hubs:
@@ -24,9 +34,13 @@ class Map:
             elif new_hub.x == hub.x and new_hub.y == hub.y:
                 raise ValueError("Duplicated coordinates for hubs")
         self.hubs.add(new_hub)
+        if new_hub.type_of_hub == 1:
+            self.start_hub = new_hub
+        elif new_hub.type_of_hub == 2:
+            self.end_hub = new_hub
 
     def get_nb_drones(self) -> int:
-        return self.__nb_drones
+        return self.nb_drones
 
     def create_connection(
             self, edge_1: str, edge_2: str, max_link_capacity: int) -> bool:
@@ -70,7 +84,7 @@ class Map:
     def initialize_drones(self) -> None:
         for hub in self.hubs:
             if hub.type_of_hub == 1:
-                hub.create_drones(self.__nb_drones)
+                hub.create_drones(self.nb_drones)
                 print("drones Created")
                 return
         raise ValueError("we cant create the drones")
@@ -90,12 +104,29 @@ class Map:
                 hub.x += lwr_x
                 hub.y += lwr_y
 
-    def check_finish(self):
-        for hub in self.hubs:
-            if hub.type_of_hub == 2:
-                if len(hub.drones) == self.__nb_drones:
-                    return 0
-                return 1
+    def check_conflicts(self) -> Any:
+        ocuppied: dict = {}
+        for id, path in self.constraint_tree.solutions:
+            for checkpoint in path:
+                position, t, *_ = checkpoint
+                key = position, t
+                ids: list = []
+                times: int = 1
+                if key in ocuppied:
+                    value = ocuppied[key]
+                    ids.extend(value[0])
+                    times = value[1]
+                    conflicting_hub: Hub = self.get_hub(position)
+                    times += 1
+                    if times > conflicting_hub.max_drones:
+                        return {
+                            "type": Conflict_types.hub,
+                            "v": position,
+                            "t": t,
+                            "drones": [ocuppied[key][0][-1], id]
+                        }
+                ids.append(id)
+                ocuppied.update({key: [ids, times]})
 
     def update_heuristic(self, hub: Hub, cost: int) -> None:
         self.heuristic.update({hub.name: cost})
@@ -110,23 +141,36 @@ class Map:
                 self.update_heuristic(
                     next_hub, cost + next_hub.calculate_hub_cost())
 
+    def create_solution(
+            self, drone: Hub.Drone, constraints: list[tuple]) -> list[tuple]:
+        return self.start_hub.calculate_route(
+            drone, self.heuristic,
+            constraints)
+
+    def update_solutions(self, constraints: list[tuple]) -> list:
+        solutions: list = []
+        for drone in self.start_hub.drones:
+            solutions.append([
+                drone, self.create_solution(
+                    drone, constraints)])
+        return solutions
+
     def initialize_heuristic_and_routes(self) -> None:
-        for hub in self.hubs:
-            if hub.type_of_hub == 2:
-                self.update_heuristic(hub, 0)
-                break
-        print(self.heuristic)
-        for hub in self.hubs:
-            if hub.type_of_hub == 1:
-                for drone in hub.drones:
-                    hub.calculate_route(drone, self.heuristic)
-                    print(drone)
+        self.update_heuristic(self.end_hub, 0)
+        solutions = self.update_solutions(self.constraint_tree.constraints)
+        self.constraint_tree = CT([], solutions)
 
     def solve(self) -> None:
         from Graphics import Graphics
 
         self.initialize_heuristic_and_routes()
-        # while (self.check_finish()):
+        conflict: Any = {}
+        while (conflict is not None):
+            conflict = self.check_conflicts()
+            if conflict is None:
+                break
+            self.constraint_tree.create_new_tree(conflict, self)
+        print(self.constraint_tree)
         g: Graphics = Graphics()
         g.initialize_graphics(self)
 

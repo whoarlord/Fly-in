@@ -9,6 +9,7 @@ def main() -> None:
         return
     drone_map: Map = Map()
     file_name: str = sys.argv[1]
+    print("hola")
     parser: Parser = Parser()
     parser.initialize(drone_map, file_name)
     print(drone_map)
