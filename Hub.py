@@ -37,6 +37,16 @@ class Connection:
             cls.wait_connection = Connection(Hub.wait(), Hub.wait(), 100000000)
         return cls.wait_connection
 
+    def check_connection_constraint(
+            self, drone: "Hub.Drone", g: int,
+            constraints: list[tuple]) -> bool:
+        for constraint in constraints:
+            if isinstance(constraint[1], Connection):
+                if (constraint[0] == drone
+                        and constraint[1] is self and constraint[2] == g):
+                    return True
+        return False
+
 
 class Hub:
     wait_Hub: Any = None
@@ -82,9 +92,10 @@ class Hub:
             if temp_hub is next_hub:
                 exist = True
         if not exist:
-            print(
-                "There is not a connection between "
-                f"{self.name} and {next_hub.name}")
+            if self.name != "Wait" and next_hub.name != "Wait":
+                print(
+                    "There is not a connection between "
+                    f"{self.name} and {next_hub.name}")
             return
         for i in range(len(self.drones)):
             if self.drones[i].get_id() == drone_id:
@@ -120,12 +131,13 @@ class Hub:
         elif self.zone.name == "priority":
             return 1
 
-    def check_constraint(self, drone: "Hub.Drone", g: int,
-                         constraints: list[tuple]) -> bool:
+    def check_hub_contraint(self, drone: "Hub.Drone", g: int,
+                            constraints: list[tuple]) -> bool:
         for constraint in constraints:
-            if (constraint[0] == drone
-                    and constraint[1] == self.name and constraint[2] == g):
-                return True
+            if isinstance(constraint[1], str):
+                if (constraint[0] == drone
+                        and constraint[1] == self.name and constraint[2] == g):
+                    return True
         return False
 
     def calculate_route(
@@ -141,7 +153,9 @@ class Hub:
             for connection in actual_hub.connections:
                 temp_hub = connection.other_hub(actual_hub)
                 if heuristic.get(temp_hub.name, 0) + g <= t:
-                    if temp_hub.check_constraint(drone, g, constraints):
+                    if (temp_hub.check_hub_contraint(drone, g, constraints)
+                            or connection.check_connection_constraint(
+                                drone, g, constraints)):
                         continue
                     t = heuristic.get(temp_hub.name, 0) + g
                     next_connection = connection

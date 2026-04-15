@@ -1,6 +1,6 @@
 from typing import Any
 from Hub import Hub, Connection
-from CT import CT, Conflict_types
+from CT import CT
 
 
 class Map:
@@ -120,8 +120,27 @@ class Map:
                     times += 1
                     if times > conflicting_hub.max_drones:
                         return {
-                            "type": Conflict_types.hub,
                             "v": position,
+                            "t": t,
+                            "drones": [ocuppied[key][0][-1], id]
+                        }
+                ids.append(id)
+                ocuppied.update({key: [ids, times]})
+        for id, path in self.constraint_tree.solutions:
+            for checkpoint in path:
+                connection: Connection
+                _, t, connection = checkpoint
+                key = connection, t
+                ids: list = []
+                times: int = 1
+                if key in ocuppied:
+                    value = ocuppied[key]
+                    ids.extend(value[0])
+                    times = value[1]
+                    times += 1
+                    if times > connection.max_link_capacity:
+                        return {
+                            "v": connection,
                             "t": t,
                             "drones": [ocuppied[key][0][-1], id]
                         }
