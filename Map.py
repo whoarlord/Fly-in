@@ -189,7 +189,8 @@ class Map:
                 ids.append(id)
                 ocuppied.update({key: [ids, times]})
 
-    def update_heuristic(self, hub: Hub, cost: int) -> None:
+    def update_heuristic(
+            self, hub: Hub, cost: int, restricted: bool = False) -> None:
         self.heuristic.update({hub.name: cost})
         next_hub: Hub
         actual_cost: int
@@ -199,8 +200,20 @@ class Map:
             if actual_cost == -1 or actual_cost > cost:
                 if (next_hub.calculate_hub_cost() == -1):
                     continue
-                self.update_heuristic(
-                    next_hub, cost + next_hub.calculate_hub_cost())
+                if (restricted):
+                    if (self.heuristic.get(next_hub.name, -1) == 2):
+                        self.update_heuristic(
+                            next_hub, cost + 2, True)
+                    else:
+                        self.update_heuristic(
+                            next_hub, cost + 2, False)
+                else:
+                    if (self.heuristic.get(next_hub.name, -1) == 2):
+                        self.update_heuristic(
+                            next_hub, cost + 1, True)
+                    else:
+                        self.update_heuristic(
+                            next_hub, cost + 1, False)
 
     def create_solution(
             self, drone: Hub.Drone, constraints: list[tuple]) -> list[tuple]:
@@ -219,6 +232,7 @@ class Map:
 
     def initialize_heuristic_and_routes(self) -> None:
         self.update_heuristic(self.end_hub, 0)
+
         solutions = self.update_solutions(self.constraint_tree.constraints)
         self.constraint_tree = CT([], solutions)
 
