@@ -127,7 +127,7 @@ class Map:
                             "drones": [ocuppied[key][0][-1], id]
                         }
                 if conflicting_hub.zone.value == "restricted":
-                    key_restricted = position, t - 1
+                    key_restricted = position, t + 1
                     ids_restricted: list = []
                     times_restricted: int = 1
                     if key_restricted in ocuppied:
@@ -142,6 +142,7 @@ class Map:
                                 "drones":
                                     [ocuppied[key_restricted][0][-1], id]
                             }
+                    ids_restricted.append(id)
                     ocuppied.update(
                         {key_restricted: [ids_restricted,
                                           times_restricted]})
@@ -167,7 +168,7 @@ class Map:
                         }
                     conflicting_hub: Hub = self.get_hub(position)
                     if conflicting_hub.zone.value == "restricted":
-                        key_restricted = connection, t - 1
+                        key_restricted = connection, t + 1
                         ids_restricted: list = []
                         times_restricted: int
                         if key_restricted in ocuppied:
