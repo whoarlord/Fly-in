@@ -1,5 +1,5 @@
 from typing import Any
-from tkinter import Tk, Canvas, mainloop, PhotoImage
+from tkinter import Tk, Canvas, mainloop, PhotoImage, TclError
 from Map import Map
 from Hub import Connection, Hub
 
@@ -28,20 +28,39 @@ class Graphics:
 
     @staticmethod
     def move(canvas: Canvas, id: int, cx: int, cy: int):
+        """function for moving thee drones to de new space"""
         canvas.coords(id, cx, cy)
 
     def animate(
             self, root: Tk, canvas: Canvas, drone_map: Map, turn: int,
             turn_id: int, drone_ids: list[int], drone_text_ids: list[int],
             scale: int = 220, margin: int = 100, id_location=58):
+        """function for making the animation of the drones moving
+
+        Args:
+        - root (Tk): the root representing the tkinter object
+        - canvas (Canvas): the window where the objects are gonna be displayed
+        - turn (int): it represents the turn that is being played at the moment
+        - turn_id (int): the id of the text that displays the turn
+        - drone_ids (list[int]): the ids of the drones to be displayed
+        - drone_text_ids (list[int]): the ids of the text that represent the
+                                        id of the drones
+        - scale (int): the scale of the objects
+        - margin (int): margin to the edge of the window
+        - id_location (int): a number for mocing the text representing the id
+                            of the drone id texts
+
+        This function iterates on the solution to make the animation of that
+        solution by mocing the specified drones
+        """
         ct = drone_map.constraint_tree
         solutions: list[tuple] = ct.solutions
-        if turn == ct.cost:
+        if turn == ct.cost + 1:
             return
         for drone, paths in solutions:
             if len(paths) == 0:
                 continue
-            if paths[0][1] - 1 != turn:
+            if paths[0][1] != turn:
                 continue
             path = paths.pop(0)
             dest_hub = drone_map.get_hub(path[0])
@@ -59,14 +78,32 @@ class Graphics:
                 canvas, drone_text_ids[drone.get_id()],
                 cx, cy + id_location)
 
-        turn += 1
         canvas.itemconfig(turn_id, text=f"Turn: {turn}")
+        turn += 1
         root.after(1000, self.animate, root, canvas, drone_map,
                    turn, turn_id, drone_ids, drone_text_ids)
 
     def initialize_graphics(
             self, drone_map: Map, height=700, width=700, scale=220,
             margin=100, radius=50):
+        """Function for creating the graphic representation
+
+        Args:
+        - drone_map(Map): the map to be represented as graphics
+        - height(int): the height of the window
+        - width(int): the width of the window
+        - scale(int): the scale of the objects
+        - margin(int): margin to the edge of the window
+        - radiuse(int): radius of the objects in the window to specify the size
+
+        This function creates all the 3 essential objects to create the map:
+        - the drones
+        - the hubs
+        - the connections
+
+        And display them in a tkinter window and make the animation based on
+        the solution the drone_map has
+        """
         root = Tk()
         height, width = self.calculate_window(drone_map, scale, margin, radius)
         connections: set[Connection] = set()
@@ -74,8 +111,15 @@ class Graphics:
         for hub in drone_map.hubs:
             cx = hub.x * scale + margin
             cy = hub.y * scale + margin
-            C.create_oval(cx - radius, cy - radius, cx + radius, cy + radius,
-                          fill=hub.color, outline="grey")
+            try:
+                C.create_oval(
+                    cx - radius, cy - radius, cx + radius, cy + radius,
+                    fill=hub.color, outline="grey")
+            except TclError as e:
+                print(f"{e}")
+                C.create_oval(
+                    cx - radius, cy - radius, cx + radius, cy + radius,
+                    fill="grey", outline="grey")
             C.create_text(cx, cy - radius - 10,
                           text=hub.name, fill="black", font=("Arial", 8))
             nb_of_drones: int = C.create_text(cx, cy, text=len(hub.drones),
@@ -110,7 +154,6 @@ class Graphics:
                 drone_map.start_hub.y * scale + margin + radius + 8,
                 text=f"id: {i} ", font=("Arial", 8))
             C.tag_raise(drone_text)
-            print(drone_text)
             drones_text.append(drone_text)
         turn_id: int = C.create_text(width/2, 15, text="Turn: 0")
         C.pack()

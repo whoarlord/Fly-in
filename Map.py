@@ -228,12 +228,10 @@ class Map:
             solutions.append([
                 drone, self.create_solution(
                     drone, constraints)])
-        print(f"solutions: {solutions}\n\n\n")
         return solutions
 
     def initialize_heuristic_and_routes(self) -> None:
         self.update_heuristic(self.end_hub, 0)
-
         solutions = self.update_solutions(self.constraint_tree.constraints)
         self.constraint_tree = CT([], solutions)
 
