@@ -109,7 +109,8 @@ class Map:
         ocuppied: dict = {}
         for id, path in self.constraint_tree.solutions:
             for checkpoint in path:
-                position, t, *_ = checkpoint
+                connection: Connection
+                position, t, connection = checkpoint
                 key = position, t
                 ids: list = []
                 times: int = 1
@@ -125,31 +126,31 @@ class Map:
                             "t": t,
                             "drones": [ocuppied[key][0][-1], id]
                         }
-                    if conflicting_hub.zone == "restricted":
-                        key_restricted = position, t - 1
-                        ids_restricted: list = []
-                        times_restricted: int = 1
-                        if key in ocuppied:
-                            value = ocuppied[key]
-                            ids_restricted.extend(value[0])
-                            times_restricted = value[1]
-                            times_restricted += 1
-                            if times_restricted > conflicting_hub.max_drones:
-                                return {
-                                    "v": position,
-                                    "t": t,
-                                    "drones":
-                                        [ocuppied[key_restricted][0][-1], id]
-                                }
-                        ocuppied.update(
-                            {key_restricted: [ids_restricted,
-                                              times_restricted]})
+                if conflicting_hub.zone.value == "restricted":
+                    key_restricted = position, t - 1
+                    ids_restricted: list = []
+                    times_restricted: int = 1
+                    if key_restricted in ocuppied:
+                        value = ocuppied[key_restricted]
+                        ids_restricted.extend(value[0])
+                        times_restricted = value[1]
+                        times_restricted += 1
+                        if times_restricted > conflicting_hub.max_drones:
+                            return {
+                                "v": position,
+                                "t": t,
+                                "drones":
+                                    [ocuppied[key_restricted][0][-1], id]
+                            }
+                    ocuppied.update(
+                        {key_restricted: [ids_restricted,
+                                          times_restricted]})
                 ids.append(id)
                 ocuppied.update({key: [ids, times]})
         for id, path in self.constraint_tree.solutions:
             for checkpoint in path:
                 connection: Connection
-                _, t, connection = checkpoint
+                position, t, connection = checkpoint
                 key = connection, t
                 ids: list = []
                 times: int = 1
@@ -164,6 +165,27 @@ class Map:
                             "t": t,
                             "drones": [ocuppied[key][0][-1], id]
                         }
+                    conflicting_hub: Hub = self.get_hub(position)
+                    if conflicting_hub.zone.value == "restricted":
+                        key_restricted = connection, t - 1
+                        ids_restricted: list = []
+                        times_restricted: int
+                        if key_restricted in ocuppied:
+                            value = ocuppied[key_restricted]
+                            ids_restricted.extend(value[0])
+                            times_restricted = value[1]
+                            times_restricted += 1
+                            if times_restricted > conflicting_hub.max_drones:
+                                return {
+                                    "v": connection,
+                                    "t": t,
+                                    "drones":
+                                        [ocuppied[key_restricted][0][-1], id]
+                                }
+                        ocuppied.update(
+                            {key_restricted: [ids_restricted,
+                                              times_restricted]})
+
                 ids.append(id)
                 ocuppied.update({key: [ids, times]})
 
@@ -192,6 +214,7 @@ class Map:
             solutions.append([
                 drone, self.create_solution(
                     drone, constraints)])
+        print(f"solutions: {solutions}\n\n\n")
         return solutions
 
     def initialize_heuristic_and_routes(self) -> None:
@@ -204,16 +227,12 @@ class Map:
 
         self.initialize_heuristic_and_routes()
         conflict: Any = {}
-        count: int = 0
-        while (conflict is not None and count < 2000):
-            # print(self.constraint_tree)
+        while (conflict is not None):
             conflict = self.check_conflicts()
             if conflict is None:
                 break
             self.constraint_tree.create_new_tree(conflict, self)
-            count += 1
-        print(count)
-        print(self.constraint_tree.solutions)
+        print(self.constraint_tree)
         g: Graphics = Graphics()
         g.initialize_graphics(self)
 
