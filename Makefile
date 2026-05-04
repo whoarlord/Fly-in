@@ -1,6 +1,6 @@
 PIP=pip install
 DEPENDENCIES= requirements.txt
-MAP=test.txt
+MAP=test2.txt
 
 PYTHON=python3
 DEBUGGER= -m pdb

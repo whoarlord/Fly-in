@@ -57,7 +57,7 @@ class Connection:
                     return True
                 if (reach_zone.value == "restricted"):
                     if (constraint[0] == drone
-                            and constraint[1] == self.name
+                            and constraint[1] is self
                             and constraint[2] == f + 1):
                         return True
         return False
@@ -211,11 +211,17 @@ class Hub:
                         next_connection = connection
                         next_hub = temp_hub
                         next_is_priority = True
-            if next_hub is actual_hub:
+            if (next_hub is actual_hub):
+                if next_hub.check_hub_contraint(drone, g, constraints):
+                    _, g, _ = route.pop()
+                    continue
                 next_connection = Connection.wait()
             actual_hub = next_hub
             route.append(tuple([actual_hub.name, g, next_connection]))
-            g += actual_hub.calculate_hub_cost()
+            if next_connection is Connection.wait():
+                g += 1
+            else:
+                g += actual_hub.calculate_hub_cost()
         return route
 
     def create_drones(self, nb_drones: int) -> None:

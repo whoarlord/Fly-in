@@ -21,19 +21,18 @@ class CT:
         self.solutions.sort(key=lambda x: x[0].get_id(), reverse=True)
         self.cost: int = self.calculate_cost(solutions)
 
-    def create_new_tree(self, conflict: dict, drone_map: Any):
+    def create_new_tree(self, conflict: dict, drone_map: Any) -> None:
         """Creation of new posible results based on the conflict
+
+        In this function you want to make a new solution, resolving conflict 
+        and getting the lowest cost making two new solutions changing
+        the solution of the drones you get and comparing both solutions
 
         Args:
         - conflict: the conflict between 2 drones in a specific time on a dict
                 {type, vertex/connection, time, drones in conflict}
         - solutions: the list of the last solutions
-
-        In this function you want to make a new solution, resolving conflict 
-        and getting the lowest cost making two new solutions changing
-        the solution of the drones you get and comparing both solutions
         """
-
         left_drone: Hub.Drone = conflict.get("drones")[0]
         rigth_drone: Hub.Drone = conflict.get("drones")[1]
         left_constraints: list[tuple] = self.constraints.copy()
@@ -54,7 +53,7 @@ class CT:
 
     def re_define_values(
             self, constraints: list[tuple],
-            solutions: list, cost: int):
+            solutions: list, cost: int) -> None:
         """Function for adapting the main constraints tree"""
         self.constraints = constraints
         self.solutions = solutions
