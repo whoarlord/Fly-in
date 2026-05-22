@@ -1,5 +1,11 @@
-from typing import Any
+from typing import Any, TypedDict
 from Hub import Hub
+
+
+class Conflict(TypedDict):
+    v: str
+    t: int
+    drones: list[Hub.Drone]
 
 
 class CT:
@@ -21,10 +27,12 @@ class CT:
         self.solutions.sort(key=lambda x: x[0].get_id(), reverse=True)
         self.cost: int = self.calculate_cost(solutions)
 
-    def create_new_tree(self, conflict: dict, drone_map: Any) -> None:
+    def create_new_tree(
+            self, conflict: Conflict,
+            drone_map: Any) -> None:
         """Creation of new posible results based on the conflict
 
-        In this function you want to make a new solution, resolving conflict 
+        In this function you want to make a new solution, resolving conflict
         and getting the lowest cost making two new solutions changing
         the solution of the drones you get and comparing both solutions
 
@@ -33,6 +41,7 @@ class CT:
                 {type, vertex/connection, time, drones in conflict}
         - solutions: the list of the last solutions
         """
+        print(f"conflic: {conflict}")
         left_drone: Hub.Drone = conflict.get("drones")[0]
         rigth_drone: Hub.Drone = conflict.get("drones")[1]
         left_constraints: list[tuple] = self.constraints.copy()
@@ -60,7 +69,7 @@ class CT:
         self.cost = cost
 
     @staticmethod
-    def calculate_cost(solutions) -> int:
+    def calculate_cost(solutions: list) -> int:
         """function for calculating the cost of a solution"""
         cost: int = 0
         for _, path in solutions:

@@ -6,7 +6,7 @@ from Hub import Connection, Hub
 
 class Graphics:
     __graphics: Any = None
-    __nb_drones_at_hub: dict[str: int] = {}
+    __nb_drones_at_hub: dict[str, int] = {}
 
     def __new__(cls) -> Any:
         if cls.__graphics is None:
@@ -14,7 +14,9 @@ class Graphics:
         return cls.__graphics
 
     @staticmethod
-    def calculate_window(drone_map: Map, scale, margin, radius) -> tuple[int]:
+    def calculate_window(drone_map: Map, scale: int,
+                         margin: int, radius: int) -> tuple[int, int]:
+        """calculates the window size"""
         height: int = 0
         width: int = 0
         for hub in drone_map.hubs:
@@ -24,17 +26,18 @@ class Graphics:
                 width = hx
             if hy > height:
                 height = hy
-        return tuple([height + radius + 15, width + radius + 15])
+        return (height + radius + 15, width + radius + 15)
 
     @staticmethod
-    def move(canvas: Canvas, id: int, cx: int, cy: int):
+    def move(canvas: Canvas, id: int, cx: int, cy: int) -> None:
         """function for moving thee drones to de new space"""
         canvas.coords(id, cx, cy)
 
     def animate(
             self, root: Tk, canvas: Canvas, drone_map: Map, turn: int,
-            turn_id: int, drone_ids: list[int], drone_text_ids: list[int],
-            scale: int = 220, margin: int = 100, id_location=58):
+            turn_id: int, drone_ids: list[int],
+            drone_text_ids: list[int], scale: int = 220, margin: int = 100,
+            id_location: int = 58) -> None:
         """function for making the animation of the drones moving
 
         Args:
@@ -84,8 +87,8 @@ class Graphics:
                    turn, turn_id, drone_ids, drone_text_ids)
 
     def initialize_graphics(
-            self, drone_map: Map, height=700, width=700, scale=220,
-            margin=100, radius=50):
+            self, drone_map: Map, height: int = 700, width: int = 700,
+            scale: int = 220, margin: int = 100, radius: int = 50) -> None:
         """Function for creating the graphic representation
 
         Args:

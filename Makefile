@@ -28,7 +28,7 @@ clean:
 
 lint:
 	flake8 .
-	mypy .  $(MYPYFLAGS)
+	mypy . $(MYPYFLAGS)
 
 lint-strict:
 	flake8 .

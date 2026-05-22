@@ -1,6 +1,7 @@
 from typing import Any
 from Hub import Hub, Connection
 from CT import CT
+import heapq
 
 
 class Map:
@@ -21,7 +22,7 @@ class Map:
         for hub in self.hubs:
             if hub.name == hub_str:
                 return hub
-        return None
+        return Hub.wait()
 
     def update_drones(self, nb_drones: int) -> None:
         self.nb_drones = nb_drones
@@ -90,7 +91,7 @@ class Map:
                 return
         raise ValueError("we cant create the drones")
 
-    def normalize_coordinates(self):
+    def normalize_coordinates(self) -> None:
         lwr_x: int = 0
         lwr_y: int = 0
         for hub in self.hubs:
@@ -105,90 +106,80 @@ class Map:
                 hub.x += lwr_x
                 hub.y += lwr_y
 
-    def check_conflicts(self) -> Any:
-        ocuppied: dict = {}
-        for id, path in self.constraint_tree.solutions:
+    def check_conflicts(self) -> dict | None:
+        ocuppied: dict[tuple, tuple[list, int]] = {}
+        for drone_id, path in self.constraint_tree.solutions:
             for checkpoint in path:
-                connection: Connection
                 position, t, connection = checkpoint
-                key = position, t
-                ids: list = []
-                times: int = 1
-                conflicting_hub: Hub = self.get_hub(position)
-                if key in ocuppied:
-                    value = ocuppied[key]
-                    ids.extend(value[0])
-                    times = value[1]
-                    times += 1
-                    if times > conflicting_hub.max_drones:
-                        return {
-                            "v": position,
-                            "t": t,
-                            "drones": [ocuppied[key][0][-1], id]
-                        }
-                if conflicting_hub.zone.value == "restricted":
-                    key_restricted = position, t + 1
-                    ids_restricted: list = []
-                    times_restricted: int = 1
-                    if key_restricted in ocuppied:
-                        value = ocuppied[key_restricted]
-                        ids_restricted.extend(value[0])
-                        times_restricted = value[1]
-                        times_restricted += 1
-                        if times_restricted > conflicting_hub.max_drones:
-                            return {
-                                "v": position,
-                                "t": t,
-                                "drones":
-                                    [ocuppied[key_restricted][0][-1], id]
-                            }
-                    ids_restricted.append(id)
-                    ocuppied.update(
-                        {key_restricted: [ids_restricted,
-                                          times_restricted]})
-                ids.append(id)
-                ocuppied.update({key: [ids, times]})
-        for id, path in self.constraint_tree.solutions:
-            for checkpoint in path:
-                connection: Connection
-                position, t, connection = checkpoint
-                key = connection, t
-                ids: list = []
-                times: int = 1
-                if key in ocuppied:
-                    value = ocuppied[key]
-                    ids.extend(value[0])
-                    times = value[1]
-                    times += 1
-                    if times > connection.max_link_capacity:
-                        return {
-                            "v": connection,
-                            "t": t,
-                            "drones": [ocuppied[key][0][-1], id]
-                        }
-                    conflicting_hub: Hub = self.get_hub(position)
-                    if conflicting_hub.zone.value == "restricted":
-                        key_restricted = connection, t + 1
-                        ids_restricted: list = []
-                        times_restricted: int
-                        if key_restricted in ocuppied:
-                            value = ocuppied[key_restricted]
-                            ids_restricted.extend(value[0])
-                            times_restricted = value[1]
-                            times_restricted += 1
-                            if times_restricted > conflicting_hub.max_drones:
-                                return {
-                                    "v": connection,
-                                    "t": t,
-                                    "drones":
-                                        [ocuppied[key_restricted][0][-1], id]
-                                }
-                        ocuppied.update(
-                            {key_restricted: [ids_restricted,
-                                              times_restricted]})
+                hub = self.get_hub(position)
 
-                ids.append(id)
-                ocuppied.update({key: [ids, times]})
+                conflict = self.register_state_hub(
+                    position, t, ocuppied, drone_id, hub)
+                if (conflict is not None):
+                    return conflict
+
+                if hub.zone.value == 'restricted':
+                    conflict = self.register_state_hub(
+                        position, t + 1, ocuppied, drone_id, hub)
+                    if (conflict is not None):
+                        return conflict
+
+        ocuppied = {}
+        for drone_id, path in self.constraint_tree.solutions:
+            for checkpoint in path:
+                position, t, connection = checkpoint
+                hub = self.get_hub(position)
+
+                conflict = self.register_state_connection(
+                    connection, t, ocuppied, drone_id, hub)
+                if (conflict is not None):
+                    return conflict
+
+                if hub.zone.value == 'restricted':
+                    conflict = self.register_state_connection(
+                        connection, t + 1, ocuppied, drone_id, hub)
+                    if (conflict is not None):
+                        return conflict
+        return None
+
+    def register_state_connection(
+            self, connection: Connection, t: int, ocuppied: dict,
+            drone_id: int, hub: Hub) -> dict:
+        key = connection, t
+        ids, count = ocuppied.get(key, ([], 0))
+
+        count += 1
+        ids = ids + [drone_id]
+
+        if count > connection.max_link_capacity:
+            return {
+                "v": connection,
+                "t": t,
+                "drones": [ids[-2], drone_id]
+            }
+
+        ocuppied[key] = (ids, count)
+        return None
+
+    def register_state_hub(
+            self, position: str | Connection, t: int, ocuppied: dict,
+            drone_id: int, hub: Hub) -> dict | None:
+
+        key = position, t
+        ids, count = ocuppied.get(key, ([], 0))
+
+        count += 1
+        ids = ids + [drone_id]
+
+        if count > hub.max_drones:
+            return {
+                "v": position,
+                "t": t,
+                "drones": [ids[-2], drone_id]
+            }
+
+        ocuppied[key] = (ids, count)
+        return None
 
     def update_heuristic(
             self, hub: Hub, cost: int, restricted: bool = False) -> None:
@@ -239,15 +230,76 @@ class Map:
         from Graphics import Graphics
 
         self.initialize_heuristic_and_routes()
+        # self.cbs()
         conflict: Any = {}
-        while (conflict is not None):
-            conflict = self.check_conflicts()
-            if conflict is None:
-                break
-            self.constraint_tree.create_new_tree(conflict, self)
-        print(self.constraint_tree)
+        try:
+            while (conflict is not None):
+                conflict = self.check_conflicts()
+                if conflict is None:
+                    break
+                self.constraint_tree.create_new_tree(conflict, self)
+        except KeyboardInterrupt:
+            print("close")
+        print(self.constraint_tree.constraints)
         g: Graphics = Graphics()
         g.initialize_graphics(self)
+
+    """ def cbs(self):
+        ct: CT = self.constraint_tree
+        counter = 0
+        visited_cases = set()
+        first_case = (
+            ct.calculate_cost(ct.solutions), counter,
+            ct.solutions, ct.constraints)
+        cbs_list = [first_case]
+
+        try:
+            while (cbs_list):
+                cost, _, solutions, constraints = heapq.heappop(cbs_list)
+                self.constraint_tree.re_define_values(
+                    constraints, solutions, cost)
+                ct = self.constraint_tree
+
+                state_key = frozenset((d.get_id(), v, t)
+                                      for d, v, t in constraints)
+                if state_key in visited_cases:
+                    continue
+                visited_cases.add(state_key)
+
+                conflict = self.check_conflicts()
+                if conflict is None:
+                    return False
+
+                left_drone: Hub.Drone = conflict.get("drones")[0]
+                left_constraints: list[tuple] = ct.constraints.copy()
+                new_constraint = tuple([left_drone, conflict.get("v"),
+                                        conflict.get("t")])
+                if new_constraint not in left_constraints:
+                    left_constraints.append(new_constraint)
+                    left_solutions = self.update_solutions(left_constraints)
+                    left_cost = self.constraint_tree.calculate_cost(
+                        left_solutions)
+                    counter += 1
+                    heapq.heappush(
+                        cbs_list,
+                        (left_cost, counter, left_solutions, left_constraints))
+
+                right_drone: Hub.Drone = conflict.get("drones")[1]
+                right_constraints: list[tuple] = ct.constraints.copy()
+                new_constraint = tuple([right_drone, conflict.get("v"),
+                                        conflict.get("t")])
+                if new_constraint not in left_constraints:
+                    right_constraints.append(new_constraint)
+                    right_solutions = self.update_solutions(right_constraints)
+                    right_cost = self.constraint_tree.calculate_cost(
+                        right_solutions)
+                    counter += 1
+                    heapq.heappush(
+                        cbs_list,
+                        (right_cost, counter, right_solutions,
+                         right_constraints))
+        except KeyboardInterrupt:
+            print(cbs_list) """
 
     def __str__(self) -> str:
         result: str = ""

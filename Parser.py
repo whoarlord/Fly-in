@@ -96,7 +96,7 @@ class Parser:
 
     def initialize(self, drone_map: Map, file_name: str) -> None:
         i: int = 1
-        nb_drones: bool = False
+        nb_drones: bool | int = False
         line_splitted: list[str]
         arguments_splitted: list[str]
         try:
@@ -109,7 +109,7 @@ class Parser:
                         continue
                     elif (line_splitted[0] == "nb_drones"):
                         if nb_drones is False:
-                            nb_drones: int = int(line_splitted[1])
+                            nb_drones = int(line_splitted[1])
                             if nb_drones < 0:
                                 raise ValueError(
                                     "Number of drones must be negative")
