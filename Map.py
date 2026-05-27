@@ -211,7 +211,7 @@ class Map:
             self, drone: Hub.Drone, constraints: list[tuple]) -> list[tuple]:
         return self.start_hub.calculate_route(
             drone, self.heuristic,
-            constraints)
+            constraints, self)
 
     def update_solutions(self, constraints: list[tuple]) -> list:
         solutions: list = []
@@ -230,7 +230,10 @@ class Map:
         from Graphics import Graphics
 
         self.initialize_heuristic_and_routes()
-        # self.cbs()
+        # try:
+        #     finish = self.cbs_greedy()
+        # except KeyboardInterrupt:
+        #     print("finish: ")
         conflict: Any = {}
         try:
             while (conflict is not None):
@@ -244,62 +247,69 @@ class Map:
         g: Graphics = Graphics()
         g.initialize_graphics(self)
 
-    """ def cbs(self):
-        ct: CT = self.constraint_tree
-        counter = 0
-        visited_cases = set()
-        first_case = (
-            ct.calculate_cost(ct.solutions), counter,
-            ct.solutions, ct.constraints)
-        cbs_list = [first_case]
+    def cbs_greedy(
+            self, constraints: list = None, depth: int = 0, beam: list = []) -> bool:
+        """
+        Greedy DFS: en cada nivel elige la rama de menor costo.
+        Si se atasca, hace backtracking al beam guardado.
+        """
 
-        try:
-            while (cbs_list):
-                cost, _, solutions, constraints = heapq.heappop(cbs_list)
-                self.constraint_tree.re_define_values(
-                    constraints, solutions, cost)
-                ct = self.constraint_tree
+        # Después del heappush, podar si crece demasiado
+        if len(beam) > 3:
+            # Quedarse solo con los MAX_BEAM mejores
+            beam_sorted = sorted(beam)[:5]
+            beam.clear()
+            beam.extend(beam_sorted)
+            heapq.heapify(beam)
+        if constraints is None:
+            constraints = self.constraint_tree.constraints.copy()
 
-                state_key = frozenset((d.get_id(), v, t)
-                                      for d, v, t in constraints)
-                if state_key in visited_cases:
-                    continue
-                visited_cases.add(state_key)
+        solutions = self.update_solutions(constraints)
+        cost = self.constraint_tree.calculate_cost(solutions)
+        self.constraint_tree.re_define_values(constraints, solutions, cost)
 
-                conflict = self.check_conflicts()
-                if conflict is None:
-                    return False
+        conflict = self.check_conflicts()
+        if conflict is None:
+            return True
+        print(conflict)
 
-                left_drone: Hub.Drone = conflict.get("drones")[0]
-                left_constraints: list[tuple] = ct.constraints.copy()
-                new_constraint = tuple([left_drone, conflict.get("v"),
-                                        conflict.get("t")])
-                if new_constraint not in left_constraints:
-                    left_constraints.append(new_constraint)
-                    left_solutions = self.update_solutions(left_constraints)
-                    left_cost = self.constraint_tree.calculate_cost(
-                        left_solutions)
-                    counter += 1
-                    heapq.heappush(
-                        cbs_list,
-                        (left_cost, counter, left_solutions, left_constraints))
+        # Generar las dos ramas
+        candidates = []
+        for drone in conflict["drones"]:
+            new_constraints = constraints.copy()
+            new_constraint = (drone, conflict["v"], conflict["t"])
+            new_constraints.append(new_constraint)
+            branch_solutions = self.update_solutions(new_constraints)
+            branch_cost = self.constraint_tree.calculate_cost(branch_solutions)
+            candidates.append((branch_cost, new_constraints))
 
-                right_drone: Hub.Drone = conflict.get("drones")[1]
-                right_constraints: list[tuple] = ct.constraints.copy()
-                new_constraint = tuple([right_drone, conflict.get("v"),
-                                        conflict.get("t")])
-                if new_constraint not in left_constraints:
-                    right_constraints.append(new_constraint)
-                    right_solutions = self.update_solutions(right_constraints)
-                    right_cost = self.constraint_tree.calculate_cost(
-                        right_solutions)
-                    counter += 1
-                    heapq.heappush(
-                        cbs_list,
-                        (right_cost, counter, right_solutions,
-                         right_constraints))
-        except KeyboardInterrupt:
-            print(cbs_list) """
+        if not candidates:
+            return False
+
+        # Ordenar: mejor costo primero
+        candidates.sort(key=lambda x: x[0])
+        best_cost, best_constraints = candidates[0]
+
+        # Guardar la rama alternativa en el beam (backtracking point)
+        if len(candidates) > 1:
+            fallback_cost, fallback_constraints = candidates[1]
+            heapq.heappush(beam, (fallback_cost, id(
+                fallback_constraints), fallback_constraints))
+
+        # Explorar la mejor rama
+        if self.cbs_greedy(best_constraints, depth + 1, beam):
+            return True
+
+        # ── BACKTRACKING: la mejor rama falló, probar desde el beam ──
+        print(f"[backtrack] depth={depth}, beam_size={len(beam)}")
+        while beam:
+            _, _, fallback_constraints = heapq.heappop(beam)
+            if self.cbs_greedy(
+                    fallback_constraints, depth + 1, beam):
+                return True
+            print(beam)
+
+        return False
 
     def __str__(self) -> str:
         result: str = ""

@@ -180,12 +180,9 @@ class Hub:
                         return True
         return False
 
-    def get_lowest_neighbor(
-            self, possible_hubs: list[tuple["Hub", Connection]],
-            actual_cost: int, t: int) -> tuple["Hub", Connection]:
+    def get_lowest_neighbor(self, possible_hubs: list[tuple["Hub", Connection]]
+                            ) -> tuple["Hub", Connection]:
         priority_list: list[tuple["Hub", Connection]] = []
-        if len(possible_hubs) == 0 or actual_cost == t:
-            return (self, Connection.wait())
         for hub, connection in possible_hubs:
             if hub.zone == Zone.priority:
                 priority_list.append((hub, connection))
@@ -197,7 +194,7 @@ class Hub:
 
     def calculate_route(
             self, drone: "Hub.Drone", heuristic: dict[str, int],
-            constraints: list[tuple]) -> list[tuple]:
+            constraints: list[tuple], drone_map) -> list[tuple]:
         g: int = 1
         actual_hub: Hub = self
         route: list[tuple] = []
@@ -224,8 +221,18 @@ class Hub:
                                 drone, g, constraints, temp_hub.zone)):
                         continue
                     posibble_hubs.append((temp_hub, connection))
-            actual_hub, next_connection = actual_hub.get_lowest_neighbor(
-                posibble_hubs, actual_cost, t)
+            if len(posibble_hubs) == 0 or actual_cost == t:
+                if (actual_hub.check_hub_contraint(drone, g, constraints)
+                    or connection.check_connection_constraint(
+                        drone, g, constraints, actual_hub.zone)):
+                    if len(route) != 0:
+                        actual_hub_name, g, _ = route.pop()
+                        actual_hub = drone_map.get_hub(actual_hub_name)
+                        g += actual_hub.calculate_hub_cost()
+                        continue
+            else:
+                actual_hub, next_connection = actual_hub.get_lowest_neighbor(
+                    posibble_hubs)
             route.append(tuple([actual_hub.name, g, next_connection]))
             g += actual_hub.calculate_hub_cost()
         return route

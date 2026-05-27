@@ -41,7 +41,6 @@ class CT:
                 {type, vertex/connection, time, drones in conflict}
         - solutions: the list of the last solutions
         """
-        print(f"conflic: {conflict}")
         left_drone: Hub.Drone = conflict.get("drones")[0]
         rigth_drone: Hub.Drone = conflict.get("drones")[1]
         left_constraints: list[tuple] = self.constraints.copy()
