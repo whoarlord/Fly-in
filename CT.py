@@ -1,11 +1,22 @@
-from typing import Any, TypedDict
-from Hub import Hub
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from Map import Map
+
+from typing import TypedDict
+from Hub import Connection, Hub
 
 
 class Conflict(TypedDict):
-    v: str
+    v: str | Connection
     t: int
     drones: list[Hub.Drone]
+
+
+Checkpoint = tuple[str, int, Connection]
+Solution = tuple[Hub.Drone, list[Checkpoint]]
+Constraint = tuple[Hub.Drone, str | Connection, int]
 
 
 class CT:
@@ -21,55 +32,54 @@ class CT:
     - rigth_node (CT): the other child
     """
 
-    def __init__(self, constraints: list[tuple], solutions: list):
-        self.constraints: list[tuple] = constraints
-        self.solutions: list = solutions
-        self.solutions.sort(key=lambda x: x[0].get_id(), reverse=True)
+    def __init__(
+            self, constraints: list[Constraint], solutions: list[Solution]):
+        print(solutions)
+        self.constraints: list[Constraint] = constraints
+        self.solutions: list[Solution] = solutions
         self.cost: int = self.calculate_cost(solutions)
 
     def create_new_tree(
             self, conflict: Conflict,
-            drone_map: Any) -> None:
-        """Creation of new posible results based on the conflict
+            drone_map: Map, solutions: list[Solution]) -> bool:
 
-        In this function you want to make a new solution, resolving conflict
-        and getting the lowest cost making two new solutions changing
-        the solution of the drones you get and comparing both solutions
-
-        Args:
-        - conflict: the conflict between 2 drones in a specific time on a dict
-                {type, vertex/connection, time, drones in conflict}
-        - solutions: the list of the last solutions
-        """
-        print(f"conflic: {conflict}")
         left_drone: Hub.Drone = conflict.get("drones")[0]
-        rigth_drone: Hub.Drone = conflict.get("drones")[1]
-        left_constraints: list[tuple] = self.constraints.copy()
-        right_constraints: list[tuple] = self.constraints.copy()
-        left_constraints.append(tuple([left_drone, conflict.get("v"),
-                                       conflict.get("t")]))
-        right_constraints.append(tuple([rigth_drone, conflict.get("v"),
-                                        conflict.get("t")]))
-        left_solutions = drone_map.update_solutions(left_constraints)
-        right_solutions = drone_map.update_solutions(right_constraints)
+        right_drone: Hub.Drone = conflict.get("drones")[1]
+
+        left_constraints = self.constraints.copy()
+        left_constraints.append(
+            (left_drone, conflict.get("v"), conflict.get("t")))
+        left_solutions = drone_map.update_affected_solution(
+            left_drone, left_constraints, solutions)
         left_cost = self.calculate_cost(left_solutions)
+
+        right_constraints = self.constraints.copy()
+        right_constraints.append(
+            (right_drone, conflict.get("v"), conflict.get("t")))
+        right_solutions = drone_map.update_affected_solution(
+            right_drone, right_constraints, solutions)
         right_cost = self.calculate_cost(right_solutions)
-        if left_cost < right_cost:
-            self.re_define_values(left_constraints, left_solutions, left_cost)
-        else:
-            self.re_define_values(
-                right_constraints, right_solutions, right_cost)
+
+        branches = sorted(
+            [(left_cost,  left_constraints,  left_solutions),
+             (right_cost, right_constraints, right_solutions)],
+            key=lambda x: x[0]
+        )
+        best_cost, best_constraints, best_solutions = branches[1]
+
+        self.re_define_values(best_constraints, best_solutions, best_cost)
+        return True
 
     def re_define_values(
-            self, constraints: list[tuple],
-            solutions: list, cost: int) -> None:
+            self, constraints: list[Constraint],
+            solutions: list[Solution], cost: int) -> None:
         """Function for adapting the main constraints tree"""
         self.constraints = constraints
         self.solutions = solutions
         self.cost = cost
 
     @staticmethod
-    def calculate_cost(solutions: list) -> int:
+    def calculate_cost(solutions: list[Solution]) -> int:
         """function for calculating the cost of a solution"""
         cost: int = 0
         for _, path in solutions:

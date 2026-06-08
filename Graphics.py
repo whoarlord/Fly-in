@@ -1,14 +1,24 @@
-from typing import Any
+from typing import Optional
 from tkinter import Tk, Canvas, mainloop, PhotoImage, TclError
 from Map import Map
 from Hub import Connection, Hub
+from CT import Solution
 
 
 class Graphics:
-    __graphics: Any = None
+    """This is a class for making the visual representation
+
+    Attributes:
+        __graphics (Optional[Graphics]): the variable representing the unique
+            graphic class
+        __nb_drones_at_hub (dict[str, int]): a dictionary with the hubs names
+            and the drone number on each one
+
+    """
+    __graphics: Optional["Graphics"] = None
     __nb_drones_at_hub: dict[str, int] = {}
 
-    def __new__(cls) -> Any:
+    def __new__(cls) -> "Graphics":
         if cls.__graphics is None:
             cls.__graphics = object.__new__(cls)
         return cls.__graphics
@@ -40,24 +50,26 @@ class Graphics:
             id_location: int = 58) -> None:
         """function for making the animation of the drones moving
 
-        Args:
-        - root (Tk): the root representing the tkinter object
-        - canvas (Canvas): the window where the objects are gonna be displayed
-        - turn (int): it represents the turn that is being played at the moment
-        - turn_id (int): the id of the text that displays the turn
-        - drone_ids (list[int]): the ids of the drones to be displayed
-        - drone_text_ids (list[int]): the ids of the text that represent the
-                                        id of the drones
-        - scale (int): the scale of the objects
-        - margin (int): margin to the edge of the window
-        - id_location (int): a number for mocing the text representing the id
-                            of the drone id texts
-
         This function iterates on the solution to make the animation of that
         solution by mocing the specified drones
+
+        Args:
+            root (Tk): the root representing the tkinter object
+            canvas (Canvas): the window where the objects are gonna be
+                displayed
+            turn (int): it represents the turn that is being played at the
+                moment
+            turn_id (int): the id of the text that displays the turn
+            drone_ids (list[int]): the ids of the drones to be displayed
+            drone_text_ids (list[int]): the ids of the text that represent the
+                                        id of the drones
+            scale (int): the scale of the objects
+            margin (int): margin to the edge of the window
+            id_location (int): a number for mocing the text representing the id
+                            of the drone id texts
         """
         ct = drone_map.constraint_tree
-        solutions: list[tuple] = ct.solutions
+        solutions: list[Solution] = ct.solutions
         if turn == ct.cost + 1:
             return
         for drone, paths in solutions:
@@ -91,14 +103,6 @@ class Graphics:
             scale: int = 220, margin: int = 100, radius: int = 50) -> None:
         """Function for creating the graphic representation
 
-        Args:
-        - drone_map(Map): the map to be represented as graphics
-        - height(int): the height of the window
-        - width(int): the width of the window
-        - scale(int): the scale of the objects
-        - margin(int): margin to the edge of the window
-        - radiuse(int): radius of the objects in the window to specify the size
-
         This function creates all the 3 essential objects to create the map:
         - the drones
         - the hubs
@@ -106,6 +110,16 @@ class Graphics:
 
         And display them in a tkinter window and make the animation based on
         the solution the drone_map has
+
+        Args:
+            drone_map(Map): the map to be represented as graphics
+            height(int): the height of the window
+            width(int): the width of the window
+            scale(int): the scale of the objects
+            margin(int): margin to the edge of the window
+            radius(int): radius of the objects in the window to specify the
+                    size
+
         """
         root = Tk()
         height, width = self.calculate_window(drone_map, scale, margin, radius)

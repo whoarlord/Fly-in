@@ -1,6 +1,11 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from CT import Constraint, Checkpoint
+
 from typing import Any, Optional
 from enum import Enum
-from random import shuffle
 
 
 class Zone(Enum):
@@ -13,10 +18,11 @@ class Zone(Enum):
 class Connection:
     """Class for making connections between Hubs
 
-    Args:
-    - edge_1: first hub of the connection
-    - edge_2: second hub of the connection
-    - max_link_capacity: maximun quantity of drones that can be on a connection
+    Attributes:
+        edge_1: first hub of the connection
+        edge_2: second hub of the connection
+        max_link_capacity: maximun quantity of drones that can be on a
+            connection
     """
     wait_connection: Optional["Connection"] = None
 
@@ -49,8 +55,26 @@ class Connection:
 
     def check_connection_constraint(
             self, drone: "Hub.Drone", f: int,
-            constraints: list[tuple], reach_zone: Zone) -> bool:
-        """Function for checking a connection based on the constraints"""
+            constraints: list[Constraint], reach_zone: Zone) -> bool:
+        """Function for checking a connection based on the constraints
+
+        this function checks the constraints list, looking for a collision
+        between de actual time and drone and the same time and drone at the
+        list, if the function detects a collision return true, if it doesn't
+        it return false.
+
+        It also checks the f + 1, in the case the reach_zone is restricted.
+
+        Args:
+            drone (Hub.Drone): the drone being checked
+            constraints (list[tuple]): the list with the constraints of the
+                possible solution
+            reach_zone (Zone): the zone of the next hub where the drone is
+                    gonna move
+
+        Returns:
+            bool: a boolean for the constraints check result
+        """
         for constraint in constraints:
             if isinstance(constraint[1], Connection):
                 if (constraint[0] == drone
@@ -67,28 +91,29 @@ class Connection:
 class Hub:
     """A class representing a hub
 
-    Args:
-    - name: the unique name of the hub
-    - x: horizontal coordinate
-    - y: vertical coordinate
-    - type_of_hub: a integer representing the type of hub between 3 hubs:
-        - type_of_hub = 0: normal hub
-        - type_of_hub = 1: start hub
-        - type_of_hub = 2: end hub
+    Attributes:
+        name: the unique name of the hub
+        x: horizontal coordinate
+        y: vertical coordinate
+        type_of_hub: a integer representing the type of hub between 3 hubs:
+        -   type_of_hub = 0: normal hub
+        -   type_of_hub = 1: start hub
+        -   type_of_hub = 2: end hub
     """
     wait_Hub: Optional["Hub"] = None
 
     class Drone:
         """A class representing each drone by an id
 
-        Args:
-        - id: an integer representing an identifier of the drone
+        Attributes:
+            id: an integer representing an identifier of the drone
         """
 
         def __init__(self, id: int):
             self.__id = id
 
         def get_id(self) -> int:
+            """Function for getting the drone id"""
             return self.__id
 
         def __str__(self) -> str:
@@ -118,6 +143,7 @@ class Hub:
         self.connections: list[Connection] = []
 
     def move_to(self, drone_id: int, next_hub: "Hub") -> None:
+        """Function for making the drone move to the next hub"""
         exist: bool = False
         if next_hub is self.wait():
             return
@@ -138,15 +164,18 @@ class Hub:
 
     @classmethod
     def wait(cls) -> "Hub":
+        """Function for returning the unique wait hub for waiting"""
         if cls.wait_Hub is None:
             cls.wait_Hub = Hub("Wait", 0, 0, -1, Zone.normal,
                                max_drones=10000000)
         return cls.wait_Hub
 
     def add_connection(self, new_connection: Connection) -> None:
+        """Function for adding a connection to a hub"""
         self.connections.append(new_connection)
 
     def check_connection_exist(self, hub_1: "Hub", hub_2: "Hub") -> bool:
+        """Function for verifying if a connection exist between 2 hubs"""
         for connection in self.connections:
             if ((connection.edge_1 == hub_1
                  and connection.edge_2 == hub_2)
@@ -156,6 +185,7 @@ class Hub:
         return False
 
     def calculate_hub_cost(self) -> int:
+        """Function for calculating the cost for moving to a hub"""
         if self.zone.name == "normal":
             return 1
         elif self.zone.name == "blocked":
@@ -167,7 +197,24 @@ class Hub:
         return 0
 
     def check_hub_contraint(self, drone: "Hub.Drone", f: int,
-                            constraints: list[tuple]) -> bool:
+                            constraints: list[Constraint]) -> bool:
+        """Function for checking a hub based on the constraints
+
+        this function checks the constraints list, looking for a collision
+        between de actual time and drone and the same time and drone at the
+        list, if the function detects a collision return true, if it doesn't
+        it return false.
+
+        It also checks the f + 1, in the case the reach_zone is restricted.
+
+        Args:
+            drone (Hub.Drone): the drone being checked
+            constraints (list[tuple]): the list with the constraints of the
+                possible solution
+
+        Returns:
+            bool: a boolean for the constraints check result
+        """
         for constraint in constraints:
             if isinstance(constraint[1], str):
                 if (constraint[0] == drone
@@ -181,56 +228,75 @@ class Hub:
         return False
 
     def get_lowest_neighbor(
-            self, possible_hubs: list[tuple["Hub", Connection]],
-            actual_cost: int, t: int) -> tuple["Hub", Connection]:
+            self, possible_hubs: list[
+                tuple["Hub", Connection]]) -> tuple["Hub", Connection]:
+        """Function for deciding the lowest neighbor to move to"""
         priority_list: list[tuple["Hub", Connection]] = []
-        if len(possible_hubs) == 0 or actual_cost == t:
+        if len(possible_hubs) == 0:
             return (self, Connection.wait())
         for hub, connection in possible_hubs:
             if hub.zone == Zone.priority:
                 priority_list.append((hub, connection))
         if len(priority_list) > 0:
-            shuffle(priority_list)
             return priority_list[0]
-        shuffle(possible_hubs)
         return possible_hubs[0]
 
     def calculate_route(
             self, drone: "Hub.Drone", heuristic: dict[str, int],
-            constraints: list[tuple]) -> list[tuple]:
+            constraints: list[Constraint]) -> list[Checkpoint]:
+        """Function for calculating the route for a drone
+
+        This function tries to get the drone from the start hub to the end hub,
+        taking in to account the constraints.
+
+        It only moves to another hub if that moves have same or lower cost.
+
+        If there are no possible lower neighbors, it just wait a turn.
+
+        Args:
+            drone (Hub.Drone): the specific drone for which the route is
+                gonna be calculated
+            heuristic (dict[str, int]): the dictionary with the specific
+                heuristic of each hub
+            constraints (list[Constraints]): the list of constraints
+
+        Returns:
+            list[Checkpoint]: the final pathing of the drone
+        """
         g: int = 1
         actual_hub: Hub = self
-        route: list[tuple] = []
-        while (actual_hub.type_of_hub != 2):
+        route: list[Checkpoint] = []
+
+        while actual_hub.type_of_hub != 2:
             actual_cost = heuristic.get(actual_hub.name, 0) + g
             t = actual_cost
-            next_connection = Connection.wait()
             posibble_hubs: list[tuple[Hub, Connection]] = []
 
             for connection in actual_hub.connections:
                 temp_hub = connection.other_hub(actual_hub)
                 f = heuristic.get(temp_hub.name, 0) + g
-                if f < t:
-                    if (temp_hub.check_hub_contraint(drone, g, constraints)
+                if f <= t:
+                    if (
+                        temp_hub.check_hub_contraint(drone, g, constraints)
                             or connection.check_connection_constraint(
                                 drone, g, constraints, temp_hub.zone)):
                         continue
                     t = f
-                    posibble_hubs = []
-                    posibble_hubs.append((temp_hub, connection))
-                elif f == t:
-                    if (temp_hub.check_hub_contraint(drone, g, constraints)
-                            or connection.check_connection_constraint(
-                                drone, g, constraints, temp_hub.zone)):
-                        continue
-                    posibble_hubs.append((temp_hub, connection))
+                    posibble_hubs = [(temp_hub, connection)]
+
             actual_hub, next_connection = actual_hub.get_lowest_neighbor(
-                posibble_hubs, actual_cost, t)
-            route.append(tuple([actual_hub.name, g, next_connection]))
-            g += actual_hub.calculate_hub_cost()
+                posibble_hubs)
+
+            route.append((actual_hub.name, g, next_connection))
+            if (actual_hub is Hub.wait()):
+                g += 1
+            else:
+                g += actual_hub.calculate_hub_cost()
+
         return route
 
     def create_drones(self, nb_drones: int) -> None:
+        """Function for creating drones at the start hub"""
         if self.type_of_hub != 1:
             print("Only the start_hub can create drones")
         else:
