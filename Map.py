@@ -374,7 +374,7 @@ class Map:
         """
         max_iter = 2000
 
-        for _ in range(max_iter):
+        for i in range(max_iter):
             conflict = self.check_conflicts()
             if conflict is None:
                 break
