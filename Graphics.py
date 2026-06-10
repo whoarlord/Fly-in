@@ -2,7 +2,7 @@ from typing import Optional
 from tkinter import Tk, Canvas, mainloop, PhotoImage, TclError
 from Map import Map
 from Hub import Connection, Hub
-from CT import Solution
+from CT import Solution, Checkpoint
 
 
 class Graphics:
@@ -30,8 +30,8 @@ class Graphics:
         height: int = 0
         width: int = 0
         for hub in drone_map.hubs:
-            hx = hub.x * scale + margin
-            hy = hub.y * scale + margin
+            hx = hub.get_x() * scale + margin
+            hy = hub.get_y() * scale + margin
             if hx > width:
                 width = hx
             if hy > height:
@@ -43,10 +43,19 @@ class Graphics:
         """function for moving thee drones to de new space"""
         canvas.coords(id, cx, cy)
 
+    @staticmethod
+    def print_step(drone: Hub.Drone, path: Checkpoint | Connection,
+                   connection: bool):
+        if (connection):
+            print(f"D{drone.get_id()}-{path} ", end="")
+        elif (path[2] != Connection.wait()):
+            print(f"D{drone.get_id()}-{path[0]} ", end="")
+
     def animate(
             self, root: Tk, canvas: Canvas, drone_map: Map, turn: int,
-            turn_id: int, drone_ids: list[int],
-            drone_text_ids: list[int], scale: int = 220, margin: int = 100,
+            turn_id: int, drone_ids: list[int], drone_text_ids: list[int],
+            last_connection: Connection | None = None,
+            scale: int = 220, margin: int = 100,
             id_location: int = 58) -> None:
         """function for making the animation of the drones moving
 
@@ -75,28 +84,34 @@ class Graphics:
         for drone, paths in solutions:
             if len(paths) == 0:
                 continue
+            if turn == 0:
+                continue
             if paths[0][1] != turn:
+                self.print_step(drone, paths[0][2], True)
                 continue
             path = paths.pop(0)
             dest_hub = drone_map.get_hub(path[0])
+            self.print_step(drone, path, False)
+            last_connection = path[2]
             actual_hub: Hub = path[2].other_hub(dest_hub)
             actual_hub.move_to(drone.get_id(), dest_hub)
-            dest_id = self.__nb_drones_at_hub[dest_hub.name]
+            dest_id = self.__nb_drones_at_hub[dest_hub.get_name()]
             canvas.itemconfig(dest_id, text=len(dest_hub.drones))
-            if actual_hub.name != "Wait":
-                actual_id = self.__nb_drones_at_hub[actual_hub.name]
+            if actual_hub.get_name() != "Wait":
+                actual_id = self.__nb_drones_at_hub[actual_hub.get_name()]
                 canvas.itemconfig(actual_id, text=len(actual_hub.drones))
-            cx = dest_hub.x * scale + margin
-            cy = dest_hub.y * scale + margin
+            cx = dest_hub.get_x() * scale + margin
+            cy = dest_hub.get_y() * scale + margin
             self.move(canvas, drone_ids[drone.get_id()], cx, cy)
             self.move(
                 canvas, drone_text_ids[drone.get_id()],
                 cx, cy + id_location)
 
         canvas.itemconfig(turn_id, text=f"Turn: {turn}")
+        print("")
         turn += 1
         root.after(1000, self.animate, root, canvas, drone_map,
-                   turn, turn_id, drone_ids, drone_text_ids)
+                   turn, turn_id, drone_ids, drone_text_ids, last_connection)
 
     def initialize_graphics(
             self, drone_map: Map, height: int = 700, width: int = 700,
@@ -126,30 +141,30 @@ class Graphics:
         connections: set[Connection] = set()
         C = Canvas(root, bg="white", height=height, width=width)
         for hub in drone_map.hubs:
-            cx = hub.x * scale + margin
-            cy = hub.y * scale + margin
+            cx = hub.get_x() * scale + margin
+            cy = hub.get_y() * scale + margin
             try:
                 C.create_oval(
                     cx - radius, cy - radius, cx + radius, cy + radius,
-                    fill=hub.color, outline="grey")
+                    fill=hub.get_color(), outline="grey")
             except TclError as e:
                 print(f"{e}")
                 C.create_oval(
                     cx - radius, cy - radius, cx + radius, cy + radius,
                     fill="grey", outline="grey")
             C.create_text(cx, cy - radius - 10,
-                          text=hub.name, fill="black", font=("Arial", 8))
+                          text=hub.get_name(), fill="black", font=("Arial", 8))
             nb_of_drones: int = C.create_text(cx, cy, text=len(hub.drones),
                                               fill="black", font=("Arial", 8))
             C.tag_raise(nb_of_drones)
             self.__nb_drones_at_hub.update(
-                {hub.name: nb_of_drones})
-            connections |= set(hub.connections)
+                {hub.get_name(): nb_of_drones})
+            connections |= set(hub.get_connections())
         for connection in connections:
-            lx1 = connection.edge_1.x * scale + margin
-            ly1 = connection.edge_1.y * scale + margin
-            lx2 = connection.edge_2.x * scale + margin
-            ly2 = connection.edge_2.y * scale + margin
+            lx1 = connection.get_edge_1().get_x() * scale + margin
+            ly1 = connection.get_edge_1().get_y() * scale + margin
+            lx2 = connection.get_edge_2().get_x() * scale + margin
+            ly2 = connection.get_edge_2().get_y() * scale + margin
             C.tag_lower(C.create_line(lx1, ly1, lx2, ly2, fill="black"))
             tx = (lx1 + lx2) / 2
             ty = (ly1 + ly2) / 2 - 15
@@ -162,13 +177,13 @@ class Graphics:
         img = PhotoImage(file="drone.png")
         for i in range(drone_map.nb_drones):
             drone = C.create_image(
-                drone_map.start_hub.x * scale + margin,
-                drone_map.start_hub.y * scale + margin, image=img)
+                drone_map.start_hub.get_x() * scale + margin,
+                drone_map.start_hub.get_y() * scale + margin, image=img)
             C.tag_lower(drone)
             drones.append(drone)
             drone_text = C.create_text(
-                drone_map.start_hub.x * scale + margin,
-                drone_map.start_hub.y * scale + margin + radius + 8,
+                drone_map.start_hub.get_x() * scale + margin,
+                drone_map.start_hub.get_y() * scale + margin + radius + 8,
                 text=f"id: {i} ", font=("Arial", 8))
             C.tag_raise(drone_text)
             drones_text.append(drone_text)

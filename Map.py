@@ -18,7 +18,7 @@ class Map:
         hubs (set[Hub]): the set of hubs received
     """
     __map: Optional["Map"] = None
-    nb_drones: int
+    nb_drones: int = -1
     start_hub: Hub
     end_hub: Hub
     heuristic: dict[str, int] = {}
@@ -34,7 +34,7 @@ class Map:
     def get_hub(self, hub_str: str) -> Hub:
         """It receives a name and returns the hub corresponding to that name"""
         for hub in self.hubs:
-            if hub.name == hub_str:
+            if hub.get_name() == hub_str:
                 return hub
         return Hub.wait()
 
@@ -52,14 +52,14 @@ class Map:
             new_hub (Hub): the hub to add
         """
         for hub in self.hubs:
-            if new_hub.name == hub.name:
+            if new_hub.get_name() == hub.get_name():
                 raise ValueError("Duplicated name of hubs")
-            elif new_hub.x == hub.x and new_hub.y == hub.y:
+            elif new_hub.get_x() == hub.get_x() and new_hub.get_y() == hub.get_y():
                 raise ValueError("Duplicated coordinates for hubs")
         self.hubs.add(new_hub)
-        if new_hub.type_of_hub == 1:
+        if new_hub.get_type_of_hub() == 1:
             self.start_hub = new_hub
-        elif new_hub.type_of_hub == 2:
+        elif new_hub.get_type_of_hub() == 2:
             self.end_hub = new_hub
 
     def create_connection(
@@ -84,10 +84,10 @@ class Map:
         hub_2: Hub
         connection: Connection
         for hub in self.hubs:
-            if hub.name == edge_1:
+            if hub.get_name() == edge_1:
                 hub_1 = hub
                 connection_1 = 1
-            elif hub.name == edge_2:
+            elif hub.get_name() == edge_2:
                 hub_2 = hub
                 connection_2 = 1
         if not connection_1 or not connection_2:
@@ -105,11 +105,11 @@ class Map:
         start: int = 0
         end: int = 0
         for hub in self.hubs:
-            if hub.type_of_hub == 1:
-                hub.max_drones = self.nb_drones
+            if hub.get_type_of_hub() == 1:
+                hub.set_max_drones(self.nb_drones)
                 start += 1
-            elif hub.type_of_hub == 2:
-                hub.max_drones = self.nb_drones
+            elif hub.get_type_of_hub() == 2:
+                hub.set_max_drones(self.nb_drones)
                 end += 1
         if start == 0:
             raise ValueError("No start hub where gave")
@@ -121,7 +121,7 @@ class Map:
     def initialize_drones(self) -> None:
         """Function for initializing all the drones at the start hub"""
         for hub in self.hubs:
-            if hub.type_of_hub == 1:
+            if hub.get_type_of_hub() == 1:
                 hub.create_drones(self.nb_drones)
                 print("drones Created")
                 return
@@ -132,16 +132,16 @@ class Map:
         lwr_x: int = 0
         lwr_y: int = 0
         for hub in self.hubs:
-            if hub.x < lwr_x:
-                lwr_x = hub.x
-            if hub.y < lwr_y:
-                lwr_y = hub.y
+            if hub.get_x() < lwr_x:
+                lwr_x = hub.get_x()
+            if hub.get_y() < lwr_y:
+                lwr_y = hub.get_y()
         lwr_x = lwr_x * -1
         lwr_y = lwr_y * -1
         if lwr_x > 0 or lwr_y > 0:
             for hub in self.hubs:
-                hub.x += lwr_x
-                hub.y += lwr_y
+                hub.add_x(lwr_x)
+                hub.add_y(lwr_y)
 
     def check_conflicts(self) -> Optional[Conflict]:
         """Function for checking conflicts between drone solutions
@@ -168,7 +168,7 @@ class Map:
                 if (conflict is not None):
                     return conflict
 
-                if hub.zone.value == 'restricted':
+                if hub.get_zone().value == 'restricted':
                     conflict = self.register_state_hub(
                         position, t + 1, ocuppied, drone_id, hub, True)
                     if (conflict is not None):
@@ -185,7 +185,7 @@ class Map:
                 if (conflict is not None):
                     return conflict
 
-                if hub.zone.value == 'restricted':
+                if hub.get_zone().value == 'restricted':
                     conflict = self.register_state_connection(
                         connection, t + 1, ocuppied, drone_id, True)
                     if (conflict is not None):
@@ -213,6 +213,8 @@ class Map:
         ids = ids + [drone_id]
 
         if count > connection.max_link_capacity:
+            if (restricted):
+                t -= 1
             return Conflict({
                 "v": connection,
                 "t": t,
@@ -243,7 +245,9 @@ class Map:
         count += 1
         ids = ids + [drone_id]
 
-        if count > hub.max_drones:
+        if count > hub.get_max_drones():
+            if (restricted):
+                t -= 1
             return Conflict({
                 "v": position,
                 "t": t,
@@ -269,29 +273,56 @@ class Map:
             restricted (bool): the bool specifying if the actuak hub is
                 restricted or not
         """
-        self.heuristic.update({hub.name: cost})
+        self.heuristic.update({hub.get_name(): cost})
         next_hub: Hub
         actual_cost: int
-        for connection in hub.connections:
+        for connection in hub.get_connections():
             next_hub = connection.other_hub(hub)
-            actual_cost = self.heuristic.get(next_hub.name, -1)
+            actual_cost = self.heuristic.get(next_hub.get_name(), -1)
             if actual_cost == -1 or actual_cost > cost:
                 if (next_hub.calculate_hub_cost() == -1):
                     continue
                 if (restricted):
-                    if (self.heuristic.get(next_hub.name, -1) == 2):
+                    if (self.heuristic.get(next_hub.get_name(), -1) == 2):
                         self.update_heuristic(
                             next_hub, cost + 2, True)
                     else:
                         self.update_heuristic(
                             next_hub, cost + 2, False)
                 else:
-                    if (self.heuristic.get(next_hub.name, -1) == 2):
+                    if (self.heuristic.get(next_hub.get_name(), -1) == 2):
                         self.update_heuristic(
                             next_hub, cost + 1, True)
                     else:
                         self.update_heuristic(
                             next_hub, cost + 1, False)
+
+    def is_connected(self) -> bool:
+        """This function checks if all the hubs are connected
+
+        This functions makes a dfs search from 1 have to all the others
+        and if the len of the visited hubs is the same that the len
+        of all the hubs, it returns true, in the other case it returns false
+
+        Returns:
+            bool: it returns true if all the map is connected and false in the
+                other case
+        """
+        visited = set()
+
+        def dfs(hub: Hub) -> None:
+            """Function for checking the connection"""
+            visited.add(hub.get_name())
+
+            for connection in hub.get_connections():
+                next_hub = connection.other_hub(hub)
+
+                if next_hub.get_name() not in visited:
+                    dfs(next_hub)
+
+        dfs(list(self.hubs)[0])
+
+        return len(visited) == len(self.hubs)
 
     def update_affected_solution(self, affected_drone: Hub.Drone,
                                  constraints: list[Constraint],
@@ -345,7 +376,13 @@ class Map:
 
     def initialize_heuristic_and_routes(self) -> None:
         """Initialize the heuristic and the routes for the drones"""
+        if (self.is_connected() is False):
+            print("No estan todos los hubs conectados")
+            exit(1)
         self.update_heuristic(self.end_hub, 0)
+        if (self.heuristic.get(self.start_hub.get_name()) is None):
+            print("is imposible to go to the end from the entry")
+            exit(1)
         solutions = self.update_solutions(self.constraint_tree.constraints)
         self.constraint_tree = CT([], solutions)
 
@@ -359,7 +396,7 @@ class Map:
             self.cbs()
         except KeyboardInterrupt:
             print("interrupted")
-        print(self.constraint_tree.constraints)
+        print(self.heuristic)
         g: Graphics = Graphics()
         g.initialize_graphics(self)
 

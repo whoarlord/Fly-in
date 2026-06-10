@@ -32,9 +32,17 @@ class Connection:
         self.edge_2: Hub = edge_2
         self.max_link_capacity: int = max_link_capacity
 
+    def get_edge_1(self) -> Hub:
+        return self.edge_1
+
+    def get_edge_2(self) -> Hub:
+        return self.edge_2
+
+    def get_max_link_capacity(self) -> int:
+        return self.max_link_capacity
+
     def __str__(self) -> str:
-        return (f"{self.edge_1.name}-{self.edge_2.name}, "
-                f"max link: {self.max_link_capacity}")
+        return (f"{self.edge_1.get_name()}-{self.edge_2.get_name()}")
 
     def __repr__(self) -> str:
         return f"[{self.__str__()}]"
@@ -130,32 +138,65 @@ class Hub:
     def __init__(self, name: str, x: int, y: int, type_of_hub: int = 0,
                  zone: Zone = Zone.normal, color: Any = None,
                  max_drones: int = 1):
-        self.name: str = name
-        self.x: int = x
-        self.y: int = y
-        self.type_of_hub: int = type_of_hub
-        self.zone: Zone = zone
-        self.color: Any = color
-        if color == "rainbow":
-            self.color = "pink"
-        self.max_drones: int = max_drones
+        self.__name: str = name
+        self.__x: int = x
+        self.__y: int = y
+        self.__type_of_hub: int = type_of_hub
+        self.__zone: Zone = zone
+        self.__color: Any = "pink" if color == "rainbow" else color
+        self.__max_drones: int = max_drones
         self.drones: list[Hub.Drone] = []
-        self.connections: list[Connection] = []
+        self.__connections: list[Connection] = []
+
+    def get_name(self) -> str:
+        return self.__name
+
+    def get_x(self) -> int:
+        return self.__x
+
+    def add_x(self, to_add: int) -> None:
+        self.__x += to_add
+
+    def get_y(self) -> int:
+        return self.__y
+
+    def add_y(self, to_add: int) -> None:
+        self.__y += to_add
+
+    def get_type_of_hub(self) -> int:
+        return self.__type_of_hub
+
+    def get_zone(self) -> Zone:
+        return self.__zone
+
+    def get_color(self) -> Any:
+        return self.__color
+
+    def get_max_drones(self) -> int:
+        return self.__max_drones
+
+    def set_max_drones(self, max_drones: int) -> int:
+        if (max_drones < 1):
+            max_drones = 1
+        self.__max_drones = max_drones
+
+    def get_connections(self) -> list[Connection]:
+        return self.__connections
 
     def move_to(self, drone_id: int, next_hub: "Hub") -> None:
         """Function for making the drone move to the next hub"""
         exist: bool = False
         if next_hub is self.wait():
             return
-        for connection in self.connections:
+        for connection in self.get_connections():
             temp_hub: Hub = connection.other_hub(self)
             if temp_hub is next_hub:
                 exist = True
         if not exist:
-            if self.name != "Wait" and next_hub.name != "Wait":
+            if self.get_name() != "Wait" and next_hub.get_name() != "Wait":
                 print(
                     "There is not a connection between "
-                    f"{self.name} and {next_hub.name}")
+                    f"{self.get_name()} and {next_hub.get_name()}")
             return
         for i in range(len(self.drones)):
             if self.drones[i].get_id() == drone_id:
@@ -172,27 +213,27 @@ class Hub:
 
     def add_connection(self, new_connection: Connection) -> None:
         """Function for adding a connection to a hub"""
-        self.connections.append(new_connection)
+        self.__connections.append(new_connection)
 
     def check_connection_exist(self, hub_1: "Hub", hub_2: "Hub") -> bool:
         """Function for verifying if a connection exist between 2 hubs"""
-        for connection in self.connections:
-            if ((connection.edge_1 == hub_1
-                 and connection.edge_2 == hub_2)
-                or (connection.edge_1 == hub_2
-                    and connection.edge_2 == hub_1)):
+        for connection in self.get_connections():
+            if ((connection.get_edge_1() == hub_1
+                 and connection.get_edge_2() == hub_2)
+                or (connection.get_edge_1() == hub_2
+                    and connection.get_edge_2() == hub_1)):
                 return True
         return False
 
     def calculate_hub_cost(self) -> int:
         """Function for calculating the cost for moving to a hub"""
-        if self.zone.name == "normal":
+        if self.get_zone().name == "normal":
             return 1
-        elif self.zone.name == "blocked":
+        elif self.get_zone().name == "blocked":
             return -1
-        elif self.zone.name == "restricted":
+        elif self.get_zone().name == "restricted":
             return 2
-        elif self.zone.name == "priority":
+        elif self.get_zone().name == "priority":
             return 1
         return 0
 
@@ -218,11 +259,12 @@ class Hub:
         for constraint in constraints:
             if isinstance(constraint[1], str):
                 if (constraint[0] == drone
-                        and constraint[1] == self.name and constraint[2] == f):
+                        and constraint[1] == self.get_name()
+                        and constraint[2] == f):
                     return True
-                if (self.zone.value == "restricted"):
+                if (self.get_zone().value == "restricted"):
                     if (constraint[0] == drone
-                            and constraint[1] == self.name
+                            and constraint[1] == self.get_name()
                             and constraint[2] == f + 1):
                         return True
         return False
@@ -235,7 +277,7 @@ class Hub:
         if len(possible_hubs) == 0:
             return (self, Connection.wait())
         for hub, connection in possible_hubs:
-            if hub.zone == Zone.priority:
+            if hub.get_zone() == Zone.priority:
                 priority_list.append((hub, connection))
         if len(priority_list) > 0:
             return priority_list[0]
@@ -267,28 +309,29 @@ class Hub:
         actual_hub: Hub = self
         route: list[Checkpoint] = []
 
-        while actual_hub.type_of_hub != 2:
-            actual_cost = heuristic.get(actual_hub.name, 0) + g
+        while actual_hub.get_type_of_hub() != 2:
+            actual_cost = heuristic.get(actual_hub.get_name(), 10000) + g
             t = actual_cost
             posibble_hubs: list[tuple[Hub, Connection]] = []
 
-            for connection in actual_hub.connections:
+            for connection in actual_hub.get_connections():
                 temp_hub = connection.other_hub(actual_hub)
-                f = heuristic.get(temp_hub.name, 0) + g
+                f = heuristic.get(temp_hub.get_name(), 10000) + g
                 if f <= t:
                     if (
                         temp_hub.check_hub_contraint(drone, g, constraints)
                             or connection.check_connection_constraint(
-                                drone, g, constraints, temp_hub.zone)):
+                                drone, g, constraints, temp_hub.get_zone())):
                         continue
                     t = f
-                    posibble_hubs = [(temp_hub, connection)]
+                    posibble_hubs.append((temp_hub, connection))
 
             actual_hub, next_connection = actual_hub.get_lowest_neighbor(
                 posibble_hubs)
 
-            route.append((actual_hub.name, g, next_connection))
-            if (actual_hub is Hub.wait()):
+            route.append((actual_hub.get_name(), g, next_connection))
+            print(route)
+            if (next_connection is Connection.wait()):
                 g += 1
             else:
                 g += actual_hub.calculate_hub_cost()
@@ -297,7 +340,7 @@ class Hub:
 
     def create_drones(self, nb_drones: int) -> None:
         """Function for creating drones at the start hub"""
-        if self.type_of_hub != 1:
+        if self.get_type_of_hub() != 1:
             print("Only the start_hub can create drones")
         else:
             for i in range(nb_drones):
@@ -306,13 +349,14 @@ class Hub:
 
     def __str__(self) -> str:
         result: str
-        result = (f"Name: {self.name}, [{self.x}, "
-                  f"{self.y}], zone: {self.zone}, "
-                  f"color: {self.color}, max drones: {self.max_drones}")
-        if len(self.connections) == 0:
+        result = (f"Name: {self.get_name()}, [{self.get_x()}, "
+                  f"{self.get_y()}], zone: {self.get_zone()}, "
+                  f"color: {self.get_color()}, "
+                  f"max drones: {self.get_max_drones()}")
+        if len(self.get_connections()) == 0:
             return result
         result += "\nConnections:\n"
-        for connection in self.connections:
+        for connection in self.get_connections():
             result += "- " + connection.__str__() + "\n"
         return result
 

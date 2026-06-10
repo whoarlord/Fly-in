@@ -51,6 +51,9 @@ class Parser:
         elif len(arguments) < 3:
             raise ValueError(
                 "Invalid number of arguments for hub")
+        elif '/' in arguments[0]:
+            raise ValueError(
+                "Invalid name for hub, it can't contain dashes")
         elif len(arguments) > 3:
             for i in range(3, len(arguments)):
                 metadata = arguments[i].split()
@@ -130,8 +133,11 @@ class Parser:
                         arguments_splitted = line_splitted[1].split()
                         self.create_connection_main(
                             drone_map, arguments_splitted)
+                    else:
+                        raise ValueError("Invalid input")
                     i += 1
                     nb_drones = True
+
             drone_map.check_start_end()
             drone_map.normalize_coordinates()
         except ValueError as e:
