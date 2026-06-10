@@ -308,6 +308,7 @@ class Hub:
         g: int = 1
         actual_hub: Hub = self
         route: list[Checkpoint] = []
+        last_hub: Hub = actual_hub
 
         while actual_hub.get_type_of_hub() != 2:
             actual_cost = heuristic.get(actual_hub.get_name(), 10000) + g
@@ -317,7 +318,7 @@ class Hub:
             for connection in actual_hub.get_connections():
                 temp_hub = connection.other_hub(actual_hub)
                 f = heuristic.get(temp_hub.get_name(), 10000) + g
-                if f <= t:
+                if f < t:
                     if (
                         temp_hub.check_hub_contraint(drone, g, constraints)
                             or connection.check_connection_constraint(
@@ -326,6 +327,7 @@ class Hub:
                     t = f
                     posibble_hubs.append((temp_hub, connection))
 
+            last_hub = actual_hub
             actual_hub, next_connection = actual_hub.get_lowest_neighbor(
                 posibble_hubs)
 
