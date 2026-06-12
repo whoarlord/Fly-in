@@ -81,31 +81,31 @@ class Graphics:
         solutions: list[Solution] = ct.solutions
         if turn == ct.cost + 1:
             return
-        for drone, paths in solutions:
-            if len(paths) == 0:
-                continue
-            if turn == 0:
-                continue
-            if paths[0][1] != turn:
-                self.print_step(drone, paths[0][2], True)
-                continue
-            path = paths.pop(0)
-            dest_hub = drone_map.get_hub(path[0])
-            self.print_step(drone, path, False)
-            last_connection = path[2]
-            actual_hub: Hub = path[2].other_hub(dest_hub)
-            actual_hub.move_to(drone.get_id(), dest_hub)
-            dest_id = self.__nb_drones_at_hub[dest_hub.get_name()]
-            canvas.itemconfig(dest_id, text=len(dest_hub.drones))
-            if actual_hub.get_name() != "Wait":
-                actual_id = self.__nb_drones_at_hub[actual_hub.get_name()]
-                canvas.itemconfig(actual_id, text=len(actual_hub.drones))
-            cx = dest_hub.get_x() * scale + margin
-            cy = dest_hub.get_y() * scale + margin
-            self.move(canvas, drone_ids[drone.get_id()], cx, cy)
-            self.move(
-                canvas, drone_text_ids[drone.get_id()],
-                cx, cy + id_location)
+        if turn != 0:
+            for drone, paths in solutions:
+                if len(paths) == 0:
+                    continue
+                if paths[0][1] != turn:
+                    print(f"turn: {turn}: ", end="")
+                    self.print_step(drone, paths[0][2], True)
+                    continue
+                path = paths.pop(0)
+                dest_hub = drone_map.get_hub(path[0])
+                self.print_step(drone, path, False)
+                last_connection = path[2]
+                actual_hub: Hub = path[2].other_hub(dest_hub)
+                actual_hub.move_to(drone.get_id(), dest_hub)
+                dest_id = self.__nb_drones_at_hub[dest_hub.get_name()]
+                canvas.itemconfig(dest_id, text=len(dest_hub.drones))
+                if actual_hub.get_name() != "Wait":
+                    actual_id = self.__nb_drones_at_hub[actual_hub.get_name()]
+                    canvas.itemconfig(actual_id, text=len(actual_hub.drones))
+                cx = dest_hub.get_x() * scale + margin
+                cy = dest_hub.get_y() * scale + margin
+                self.move(canvas, drone_ids[drone.get_id()], cx, cy)
+                self.move(
+                    canvas, drone_text_ids[drone.get_id()],
+                    cx, cy + id_location)
 
         canvas.itemconfig(turn_id, text=f"Turn: {turn}")
         print("")

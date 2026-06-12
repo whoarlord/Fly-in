@@ -269,19 +269,27 @@ class Hub:
                         return True
         return False
 
-    def get_lowest_neighbor(
-            self, possible_hubs: list[
-                tuple["Hub", Connection]]) -> tuple["Hub", Connection]:
+    def get_lowest_neighbor(self, possible_hubs:
+                            list[tuple["Hub", Connection]],
+                            last_hub: "Hub") -> tuple["Hub", Connection] | bool:
         """Function for deciding the lowest neighbor to move to"""
         priority_list: list[tuple["Hub", Connection]] = []
+        result: tuple["Hub", Connection]
+
         if len(possible_hubs) == 0:
             return (self, Connection.wait())
         for hub, connection in possible_hubs:
             if hub.get_zone() == Zone.priority:
                 priority_list.append((hub, connection))
         if len(priority_list) > 0:
-            return priority_list[0]
-        return possible_hubs[0]
+            result = priority_list[0]
+        else:
+            result = possible_hubs[0]
+        if (result[0] == last_hub):
+            exit(1)
+            return True
+        else:
+            return result
 
     def calculate_route(
             self, drone: "Hub.Drone", heuristic: dict[str, int],
@@ -308,7 +316,9 @@ class Hub:
         g: int = 1
         actual_hub: Hub = self
         route: list[Checkpoint] = []
-        last_hub: Hub = actual_hub
+        last_hub: str = actual_hub.get_name()
+        temp_checkpoint: tuple["Hub", Connection] | bool
+        next_connection: Connection
 
         while actual_hub.get_type_of_hub() != 2:
             actual_cost = heuristic.get(actual_hub.get_name(), 10000) + g
@@ -318,21 +328,43 @@ class Hub:
             for connection in actual_hub.get_connections():
                 temp_hub = connection.other_hub(actual_hub)
                 f = heuristic.get(temp_hub.get_name(), 10000) + g
-                if f < t:
+                if f <= t:
                     if (
                         temp_hub.check_hub_contraint(drone, g, constraints)
                             or connection.check_connection_constraint(
                                 drone, g, constraints, temp_hub.get_zone())):
                         continue
-                    t = f
-                    posibble_hubs.append((temp_hub, connection))
+                    if (f < t):
+                        posibble_hubs = [(temp_hub, connection)]
+                        t = f
+                    else:
+                        posibble_hubs.append((temp_hub, connection))
 
-            last_hub = actual_hub
-            actual_hub, next_connection = actual_hub.get_lowest_neighbor(
-                posibble_hubs)
+            temp_checkpoint = actual_hub.get_lowest_neighbor(
+                posibble_hubs, last_hub)
+            gap: int = 1
+            while (isinstance(temp_checkpoint, bool)):
+                posibble_hubs: list[tuple[Hub, Connection]] = []
+
+                for connection in actual_hub.get_connections():
+                    temp_hub = connection.other_hub(actual_hub)
+                    f = heuristic.get(temp_hub.get_name(), 10000) + g
+                    if f <= t + gap:
+                        if (
+                            temp_hub.check_hub_contraint(drone, g, constraints)
+                                or connection.check_connection_constraint(
+                                    drone, g, constraints, temp_hub.get_zone())):
+                            continue
+                        posibble_hubs.append((temp_hub, connection))
+                posibble_hubs = [t for t in posibble_hubs
+                                 if t[0].get_name() != last_hub]
+                temp_checkpoint = actual_hub.get_lowest_neighbor(
+                    posibble_hubs, last_hub)
+                gap += 1
+            last_hub = actual_hub.get_name()
+            actual_hub, next_connection = temp_checkpoint
 
             route.append((actual_hub.get_name(), g, next_connection))
-            print(route)
             if (next_connection is Connection.wait()):
                 g += 1
             else:

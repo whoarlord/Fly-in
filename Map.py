@@ -169,10 +169,15 @@ class Map:
                     return conflict
 
                 if hub.get_zone().value == 'restricted':
-                    conflict = self.register_state_hub(
-                        position, t + 1, ocuppied, drone_id, hub, True)
-                    if (conflict is not None):
-                        return conflict
+                    already_in_path = any(
+                        p == position and ts == t + 1
+                        for p, ts, _ in path
+                    )
+                    if not already_in_path:
+                        conflict = self.register_state_hub(
+                            position, t + 1, ocuppied, drone_id, hub, True)
+                        if conflict is not None:
+                            return conflict
 
         ocuppied = {}
         for drone_id, path in self.constraint_tree.solutions:
@@ -186,10 +191,15 @@ class Map:
                     return conflict
 
                 if hub.get_zone().value == 'restricted':
-                    conflict = self.register_state_connection(
-                        connection, t + 1, ocuppied, drone_id, True)
-                    if (conflict is not None):
-                        return conflict
+                    already_in_path = any(
+                        p == position and ts == t + 1
+                        for p, ts, _ in path
+                    )
+                    if not already_in_path:
+                        conflict = self.register_state_connection(
+                            connection, t + 1, ocuppied, drone_id, True)
+                        if conflict is not None:
+                            return conflict
         return None
 
     def register_state_connection(
@@ -273,29 +283,26 @@ class Map:
             restricted (bool): the bool specifying if the actuak hub is
                 restricted or not
         """
-        self.heuristic.update({hub.get_name(): cost})
-        next_hub: Hub
-        actual_cost: int
+
+        current = self.heuristic.get(hub.get_name())
+
+        if current is not None and current <= cost:
+            return
+
+        self.heuristic[hub.get_name()] = cost
+
         for connection in hub.get_connections():
             next_hub = connection.other_hub(hub)
-            actual_cost = self.heuristic.get(next_hub.get_name(), -1)
-            if actual_cost == -1 or actual_cost > cost:
-                if (next_hub.calculate_hub_cost() == -1):
-                    continue
-                if (restricted):
-                    if (self.heuristic.get(next_hub.get_name(), -1) == 2):
-                        self.update_heuristic(
-                            next_hub, cost + 2, True)
-                    else:
-                        self.update_heuristic(
-                            next_hub, cost + 2, False)
-                else:
-                    if (self.heuristic.get(next_hub.get_name(), -1) == 2):
-                        self.update_heuristic(
-                            next_hub, cost + 1, True)
-                    else:
-                        self.update_heuristic(
-                            next_hub, cost + 1, False)
+
+            hub_cost = next_hub.calculate_hub_cost()
+
+            if hub_cost == -1:
+                continue
+
+            self.update_heuristic(
+                next_hub,
+                cost + hub_cost
+            )
 
     def is_connected(self) -> bool:
         """This function checks if all the hubs are connected
@@ -396,7 +403,7 @@ class Map:
             self.cbs()
         except KeyboardInterrupt:
             print("interrupted")
-        print(self.heuristic)
+        print(self.constraint_tree.solutions)
         g: Graphics = Graphics()
         g.initialize_graphics(self)
 
