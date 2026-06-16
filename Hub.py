@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from CT import Constraint, Checkpoint
+    from Map import Map
 
 from typing import Any, Optional
 from enum import Enum
@@ -71,7 +72,7 @@ class Connection:
         list, if the function detects a collision return true, if it doesn't
         it return false.
 
-        It also checks the f + 1, in the case the reach_zone is restricted.
+        It also checks the f - 1, in the case the reach_zone is restricted.
 
         Args:
             drone (Hub.Drone): the drone being checked
@@ -175,7 +176,7 @@ class Hub:
     def get_max_drones(self) -> int:
         return self.__max_drones
 
-    def set_max_drones(self, max_drones: int) -> int:
+    def set_max_drones(self, max_drones: int) -> None:
         if (max_drones < 1):
             max_drones = 1
         self.__max_drones = max_drones
@@ -195,7 +196,7 @@ class Hub:
         if not exist:
             if self.get_name() != "Wait" and next_hub.get_name() != "Wait":
                 print(
-                    "There is not a connection between "
+                    f"for drone {drone_id}. There is not a connection between "
                     f"{self.get_name()} and {next_hub.get_name()}")
             return
         for i in range(len(self.drones)):
@@ -265,13 +266,15 @@ class Hub:
                 if (self.get_zone().value == "restricted"):
                     if (constraint[0] == drone
                             and constraint[1] == self.get_name()
-                            and constraint[2] == f + 1):
+                            and constraint[2] == f - 1):
                         return True
+
         return False
 
-    def get_lowest_neighbor(self, possible_hubs:
-                            list[tuple["Hub", Connection]],
-                            last_hub: "Hub") -> tuple["Hub", Connection] | bool:
+    def get_lowest_neighbor(
+        self, possible_hubs:
+        list[tuple["Hub", Connection]]) -> tuple["Hub",
+                                                 Connection]:
         """Function for deciding the lowest neighbor to move to"""
         priority_list: list[tuple["Hub", Connection]] = []
         result: tuple["Hub", Connection]
@@ -285,14 +288,11 @@ class Hub:
             result = priority_list[0]
         else:
             result = possible_hubs[0]
-        if (result[0] == last_hub):
-            exit(1)
-            return True
-        else:
-            return result
+        return result
 
     def calculate_route(
-            self, drone: "Hub.Drone", heuristic: dict[str, int],
+            self, drone_map: "Map", drone: "Hub.Drone",
+            heuristic: dict[str, int],
             constraints: list[Constraint]) -> list[Checkpoint]:
         """Function for calculating the route for a drone
 
@@ -313,26 +313,27 @@ class Hub:
         Returns:
             list[Checkpoint]: the final pathing of the drone
         """
-        g: int = 1
+        g: int = 0
         actual_hub: Hub = self
         route: list[Checkpoint] = []
-        last_hub: str = actual_hub.get_name()
-        temp_checkpoint: tuple["Hub", Connection] | bool
         next_connection: Connection
 
         while actual_hub.get_type_of_hub() != 2:
-            actual_cost = heuristic.get(actual_hub.get_name(), 10000) + g
+            actual_cost = heuristic.get(actual_hub.get_name(), 10000)
             t = actual_cost
             posibble_hubs: list[tuple[Hub, Connection]] = []
 
             for connection in actual_hub.get_connections():
                 temp_hub = connection.other_hub(actual_hub)
-                f = heuristic.get(temp_hub.get_name(), 10000) + g
+                temp_hub_cost = temp_hub.calculate_hub_cost()
+                f = heuristic.get(temp_hub.get_name(), 10000)
                 if f <= t:
                     if (
-                        temp_hub.check_hub_contraint(drone, g, constraints)
+                        temp_hub.check_hub_contraint(drone, g + temp_hub_cost,
+                                                     constraints)
                             or connection.check_connection_constraint(
-                                drone, g, constraints, temp_hub.get_zone())):
+                                drone, g + temp_hub_cost, constraints,
+                                temp_hub.get_zone())):
                         continue
                     if (f < t):
                         posibble_hubs = [(temp_hub, connection)]
@@ -340,35 +341,15 @@ class Hub:
                     else:
                         posibble_hubs.append((temp_hub, connection))
 
-            temp_checkpoint = actual_hub.get_lowest_neighbor(
-                posibble_hubs, last_hub)
-            gap: int = 1
-            while (isinstance(temp_checkpoint, bool)):
-                posibble_hubs: list[tuple[Hub, Connection]] = []
+            actual_hub, next_connection = actual_hub.get_lowest_neighbor(
+                posibble_hubs)
 
-                for connection in actual_hub.get_connections():
-                    temp_hub = connection.other_hub(actual_hub)
-                    f = heuristic.get(temp_hub.get_name(), 10000) + g
-                    if f <= t + gap:
-                        if (
-                            temp_hub.check_hub_contraint(drone, g, constraints)
-                                or connection.check_connection_constraint(
-                                    drone, g, constraints, temp_hub.get_zone())):
-                            continue
-                        posibble_hubs.append((temp_hub, connection))
-                posibble_hubs = [t for t in posibble_hubs
-                                 if t[0].get_name() != last_hub]
-                temp_checkpoint = actual_hub.get_lowest_neighbor(
-                    posibble_hubs, last_hub)
-                gap += 1
-            last_hub = actual_hub.get_name()
-            actual_hub, next_connection = temp_checkpoint
-
-            route.append((actual_hub.get_name(), g, next_connection))
-            if (next_connection is Connection.wait()):
+            if next_connection is Connection.wait():
                 g += 1
             else:
                 g += actual_hub.calculate_hub_cost()
+
+            route.append((actual_hub.get_name(), g, next_connection))
 
         return route
 

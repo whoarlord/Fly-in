@@ -21,7 +21,6 @@ def main() -> None:
     except PermissionError as e:
         print(e)
         exit(1)
-    print(drone_map)
     drone_map.solve()
 
 

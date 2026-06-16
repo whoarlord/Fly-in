@@ -45,8 +45,9 @@ class Graphics:
 
     @staticmethod
     def print_step(drone: Hub.Drone, path: Checkpoint | Connection,
-                   connection: bool):
-        if (connection):
+                   connection: bool) -> None:
+        """Function for printing each step"""
+        if (isinstance(path, Connection)):
             print(f"D{drone.get_id()}-{path} ", end="")
         elif (path[2] != Connection.wait()):
             print(f"D{drone.get_id()}-{path[0]} ", end="")
@@ -54,7 +55,7 @@ class Graphics:
     def animate(
             self, root: Tk, canvas: Canvas, drone_map: Map, turn: int,
             turn_id: int, drone_ids: list[int], drone_text_ids: list[int],
-            last_connection: Connection | None = None,
+            last_hubs: list[Hub],
             scale: int = 220, margin: int = 100,
             id_location: int = 58) -> None:
         """function for making the animation of the drones moving
@@ -72,6 +73,8 @@ class Graphics:
             drone_ids (list[int]): the ids of the drones to be displayed
             drone_text_ids (list[int]): the ids of the text that represent the
                                         id of the drones
+            last_hubs (list[Hub]): the list of hubs which have been visited
+                    before
             scale (int): the scale of the objects
             margin (int): margin to the edge of the window
             id_location (int): a number for mocing the text representing the id
@@ -81,18 +84,27 @@ class Graphics:
         solutions: list[Solution] = ct.solutions
         if turn == ct.cost + 1:
             return
+        print(f"turn: {turn}")
+        i = 0
         if turn != 0:
             for drone, paths in solutions:
                 if len(paths) == 0:
+                    i += 1
                     continue
-                if paths[0][1] != turn:
-                    print(f"turn: {turn}: ", end="")
-                    self.print_step(drone, paths[0][2], True)
+                if paths[0][1] != turn and paths[0][2] != Connection.wait():
+                    path = paths[0]
+                    dest_hub = drone_map.get_hub(path[0])
+                    self.print_step(drone, path[2], True)
+                    last_hubs[i].move_to(drone.get_id(), dest_hub)
+                    i += 1
+                    dest_id = self.__nb_drones_at_hub[last_hubs[i].get_name()]
+                    canvas.itemconfig(dest_id, text=len(last_hubs[i].drones))
                     continue
                 path = paths.pop(0)
                 dest_hub = drone_map.get_hub(path[0])
                 self.print_step(drone, path, False)
-                last_connection = path[2]
+                last_hubs[i] = dest_hub
+                i += 1
                 actual_hub: Hub = path[2].other_hub(dest_hub)
                 actual_hub.move_to(drone.get_id(), dest_hub)
                 dest_id = self.__nb_drones_at_hub[dest_hub.get_name()]
@@ -111,7 +123,7 @@ class Graphics:
         print("")
         turn += 1
         root.after(1000, self.animate, root, canvas, drone_map,
-                   turn, turn_id, drone_ids, drone_text_ids, last_connection)
+                   turn, turn_id, drone_ids, drone_text_ids, last_hubs)
 
     def initialize_graphics(
             self, drone_map: Map, height: int = 700, width: int = 700,
@@ -189,6 +201,8 @@ class Graphics:
             drones_text.append(drone_text)
         turn_id: int = C.create_text(width/2, 15, text="Turn: 0")
         C.pack()
-        root.after(500, self.animate, root, C,
-                   drone_map, 0, turn_id, drones, drones_text, scale, margin)
+        arr = [drone_map.start_hub] * (drone_map.nb_drones + 1)
+        root.after(
+            500, self.animate, root, C, drone_map, 0, turn_id, drones,
+            drones_text, arr, scale, margin)
         mainloop()

@@ -10,6 +10,24 @@ class Parser:
     @staticmethod
     def create_connection_main(
             drone_map: Map, arguments: list[str]) -> None:
+        """Parse and create a connection between two hubs.
+
+        Parses the raw argument tokens from the map file and delegates
+        the connection creation to the drone_map. Validates argument count,
+        edge format and optional max_link_capacity metadata.
+
+        Args:
+            drone_map (Map): The map instance where the connection
+                will be registered.
+            arguments (list[str]): Tokenized arguments from the map file.
+                The first element must be 'hub1-hub2' and the optional
+                second element must be '[max_link_capacity=N]'.
+
+        Raises:
+            ValueError: If the number of arguments is invalid, the edge
+                format is malformed, the metadata key is unrecognized,
+                max_link_capacity is negative, or either hub does not exist.
+        """
         max_link_capacity: int = 1
         line_splitted: list[str]
         line_splitted_link: list[str]
@@ -39,6 +57,27 @@ class Parser:
 
     def create_hub(self, drone_map: Map, arguments: list[str],
                    type_of_hub: int) -> None:
+        """Parse and create a hub from raw map file tokens.
+
+        Validates the arguments and optional metadata, then constructs
+        a Hub instance and registers it in the drone_map. Tracks whether
+        a start or end hub has already been defined to prevent duplicates.
+
+        Args:
+            drone_map (Map): The map instance where the hub will
+                be registered.
+            arguments (list[str]): Tokenized arguments from the map file.
+                Must contain at least name, x and y coordinates, plus
+                optional metadata in '[key=value]' format.
+            type_of_hub (int): Hub role identifier. 1 for start hub,
+                2 for end hub, 0 for intermediate hub.
+
+        Raises:
+            ValueError: If a start or end hub is duplicated, the argument
+                count is insufficient, the hub name contains a slash,
+                the metadata format is invalid, an unrecognized metadata
+                key is found, or max_drones is negative.
+        """
         metadata: list[str] = []
         attribute: list[str] = []
         zone: Zone = Zone.normal
@@ -98,6 +137,18 @@ class Parser:
             arguments[2]), type_of_hub, zone, color, max_drones))
 
     def initialize(self, drone_map: Map, file_name: str) -> None:
+        """Parse a map file and populate the drone_map with its contents.
+
+        Reads the map definition file line by line, dispatching each
+        directive (nb_drones, start_hub, end_hub, hub, connection) to
+        the appropriate handler. Blank lines and comments (lines starting
+        with '#') are ignored. Finalizes the map by checking start/end
+        hub presence and normalizing hub coordinates.
+
+        Args:
+            drone_map (Map): The map instance to populate.
+            file_name (str): Path to the map definition file.
+        """
         i: int = 1
         nb_drones: bool | int = False
         line_splitted: list[str]

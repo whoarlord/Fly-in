@@ -21,7 +21,7 @@ Fly-in/
 ├── Parser.py        # Parseo del archivo de mapa
 ├── Graphics.py      # Representación visual con tkinter
 ├── maps/            # Directorio con mapas de ejemplo
-├── test2.txt        # Mapa de prueba avanzado ("The Impossible Dream")
+├── map.txt          # Mapa
 ├── drone.png        # Imagen del dron usada en la visualización
 ├── requirements.txt # Dependencias del proyecto
 └── Makefile         # Reglas de compilación/ejecución
@@ -33,11 +33,6 @@ Fly-in/
 
 - Python 3.10 o superior
 - `tkinter` (incluido en la mayoría de distribuciones de Python estándar; en algunos sistemas Linux puede requerir instalación adicional)
-- `pytest` (para ejecutar los tests)
-
-```bash
-pip install -r requirements.txt
-```
 
 En sistemas basados en Debian/Ubuntu, si `tkinter` no está disponible:
 
@@ -54,19 +49,7 @@ python3 main.py <archivo_de_mapa>
 **Ejemplo:**
 
 ```bash
-python3 main.py test2.txt
-```
-
-También es posible usar el `Makefile` si está configurado para ello:
-
-```bash
-make run MAP=test2.txt
-```
-
-### Tests
-
-```bash
-pytest
+python3 main.py map.txt
 ```
 
 ### Formato del archivo de mapa
@@ -142,10 +125,10 @@ Esta representación visual permite:
 
 ## Ejemplo de Uso
 
-Dado el mapa `test2.txt` ("The Impossible Dream"), que incluye 25 drones, múltiples zonas restringidas, puertas de capacidad 1 y más de 60 hubs, el programa intenta calcular rutas válidas para todos los drones. Es un mapa de estrés diseñado para explorar los límites del algoritmo.
+Dado el mapa `map.txt` ("The Impossible Dream"), que incluye 25 drones, múltiples zonas restringidas, puertas de capacidad 1 y más de 60 hubs, el programa intenta calcular rutas válidas para todos los drones. Es un mapa de estrés diseñado para explorar los límites del algoritmo.
 
 ```bash
-python3 main.py test2.txt
+python3 main.py map.txt
 ```
 
 La salida por consola mostrará los conflictos detectados en cada iteración y la heurística calculada. Al terminar, se abre la ventana de animación.

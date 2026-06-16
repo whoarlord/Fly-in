@@ -1,5 +1,5 @@
 from typing import Optional
-from Hub import Hub, Connection
+from Hub import Hub, Connection, Zone
 from CT import CT, Conflict, Solution, Constraint
 
 Ocuppied = dict[tuple[str | Connection, int], tuple[list[Hub.Drone], int]]
@@ -54,7 +54,8 @@ class Map:
         for hub in self.hubs:
             if new_hub.get_name() == hub.get_name():
                 raise ValueError("Duplicated name of hubs")
-            elif new_hub.get_x() == hub.get_x() and new_hub.get_y() == hub.get_y():
+            elif (new_hub.get_x() == hub.get_x()
+                  and new_hub.get_y() == hub.get_y()):
                 raise ValueError("Duplicated coordinates for hubs")
         self.hubs.add(new_hub)
         if new_hub.get_type_of_hub() == 1:
@@ -168,14 +169,14 @@ class Map:
                 if (conflict is not None):
                     return conflict
 
-                if hub.get_zone().value == 'restricted':
+                if hub.get_zone() == Zone.restricted:
                     already_in_path = any(
-                        p == position and ts == t + 1
+                        p == position and ts == t - 1
                         for p, ts, _ in path
                     )
                     if not already_in_path:
                         conflict = self.register_state_hub(
-                            position, t + 1, ocuppied, drone_id, hub, True)
+                            position, t - 1, ocuppied, drone_id, hub, True)
                         if conflict is not None:
                             return conflict
 
@@ -192,12 +193,12 @@ class Map:
 
                 if hub.get_zone().value == 'restricted':
                     already_in_path = any(
-                        p == position and ts == t + 1
+                        p == position and ts == t - 1
                         for p, ts, _ in path
                     )
                     if not already_in_path:
                         conflict = self.register_state_connection(
-                            connection, t + 1, ocuppied, drone_id, True)
+                            connection, t - 1, ocuppied, drone_id, True)
                         if conflict is not None:
                             return conflict
         return None
@@ -205,16 +206,25 @@ class Map:
     def register_state_connection(
             self, connection: Connection, t: int, ocuppied: Ocuppied,
             drone_id: Hub.Drone, restricted: bool) -> Optional[Conflict]:
-        """Function for registering the connection at the ocuppied dict
+        """Register a connection traversal in the occupied dictionary.
 
-        This function updates the ocuppied dictionary with the drone ids,
-        and the time whem that drones reach the hub
+        Updates the occupied dictionary with the drone crossing the given
+        connection at timestep t. If the number of drones exceeds the
+        connection's max link capacity, a conflict is returned instead.
 
-        But if it detects a conflict it returns it
+        Args:
+            connection (Connection): The connection being traversed.
+            t (int): Timestep at which the drone crosses the connection.
+            ocuppied (Ocuppied): Dictionary tracking drone occupancy
+                indexed by (vertex, timestep).
+            drone_id (Hub.Drone): The drone being registered.
+            restricted (bool): If True, shifts the conflict timestep by 1
+                to account for restricted zone offset.
 
         Returns:
-            Optional[Conflict]: it returns a tuple with the time, the hub or
-                the connecion, and the drones in conflict
+            Optional[Conflict]: A Conflict with the connection, timestep
+            and the two drones in conflict if capacity is exceeded,
+            None otherwise.
         """
         key = connection, t
         ids, count = ocuppied.get(key, ([], 0))
@@ -224,7 +234,7 @@ class Map:
 
         if count > connection.max_link_capacity:
             if (restricted):
-                t -= 1
+                t += 1
             return Conflict({
                 "v": connection,
                 "t": t,
@@ -238,16 +248,27 @@ class Map:
             self, position: str | Connection, t: int, ocuppied: Ocuppied,
             drone_id: Hub.Drone, hub: Hub,
             restricted: bool) -> Optional[Conflict] | None:
-        """Function for registering the connection at the ocuppied dict
+        """Register a hub arrival in the occupied dictionary.
 
-        This function updates the ocuppied dictionary with the drone ids,
-        and the time whem that drones reach the hub
+        Updates the occupied dictionary with the drone arriving at the given
+        hub at timestep t. If the number of drones exceeds the hub's max
+        drone capacity, a conflict is returned instead.
 
-        But if it detects a conflict it returns it
+        Args:
+            position (str | Connection): The hub position identifier
+                being registered.
+            t (int): Timestep at which the drone arrives at the hub.
+            ocuppied (Ocuppied): Dictionary tracking drone occupancy
+                indexed by (vertex, timestep).
+            drone_id (Hub.Drone): The drone being registered.
+            hub (Hub): The hub object, used to query its max drone capacity.
+            restricted (bool): If True, shifts the conflict timestep by 1
+                to account for restricted zone offset.
 
         Returns:
-            Optional[Conflict]: it returns a tuple with the time, the hub or
-                the connecion, and the drones in conflict
+            Optional[Conflict]: A Conflict with the position, timestep
+            and the two drones in conflict if capacity is exceeded,
+            None otherwise.
         """
         key = position, t
         ids, count = ocuppied.get(key, ([], 0))
@@ -257,7 +278,7 @@ class Map:
 
         if count > hub.get_max_drones():
             if (restricted):
-                t -= 1
+                t += 1
             return Conflict({
                 "v": position,
                 "t": t,
@@ -294,7 +315,7 @@ class Map:
         for connection in hub.get_connections():
             next_hub = connection.other_hub(hub)
 
-            hub_cost = next_hub.calculate_hub_cost()
+            hub_cost = hub.calculate_hub_cost()
 
             if hub_cost == -1:
                 continue
@@ -355,7 +376,7 @@ class Map:
         for drone, path in current_solution:
             if (drone.get_id() == affected_drone.get_id()):
                 solution = self.start_hub.calculate_route(
-                    drone, self.heuristic, constraints)
+                    self, drone, self.heuristic, constraints)
                 solutions.append((drone, solution))
             else:
                 solutions.append((drone, path))
@@ -377,7 +398,7 @@ class Map:
         solutions: list[Solution] = []
         for drone in self.start_hub.drones:
             solution = self.start_hub.calculate_route(
-                drone, self.heuristic, constraints)
+                self, drone, self.heuristic, constraints)
             solutions.append((drone, solution))
         return solutions
 
@@ -399,11 +420,9 @@ class Map:
 
         try:
             self.initialize_heuristic_and_routes()
-            print(f"heuristic: {self.heuristic}")
             self.cbs()
         except KeyboardInterrupt:
             print("interrupted")
-        print(self.constraint_tree.solutions)
         g: Graphics = Graphics()
         g.initialize_graphics(self)
 
